@@ -26,12 +26,17 @@ import unicodedata
 from dotenv import load_dotenv
 import uuid
 from pathlib import Path
+import sys
+
+# Adicionar o diretório raiz do projeto ao sys.path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 # Importar sistemas profissionais
-from config_manager import ConfigManager
-from professional_logger import ProfessionalLogger
-from data_validator import DataValidator
-from theme_manager import ThemeManager
+from core.config_manager import ConfigManager
+from core.professional_logger import ProfessionalLogger
+from core.data_validator import DataValidator
+from core.theme_manager import ThemeManager
 
 # Carrega as variáveis de ambiente
 load_dotenv()
@@ -794,7 +799,7 @@ class Python4WorkPro:
         """Executa consulta de acordo"""
         try:
             # Importar função do script original
-            from consultar_acordo import consultar_status_acordo
+            from src.consultar_acordo import consultar_status_acordo
             
             # Ler arquivo
             df = pd.read_excel(arquivo_entrada)
@@ -958,7 +963,7 @@ class Python4WorkPro:
         """Executa obtenção de dívida por CPF"""
         try:
             # Importar função do script original
-            from obter_divida_cpf import consultar_easycollector
+            from src.obter_divida_cpf import consultar_easycollector
             
             # Ler arquivo
             df = pd.read_excel(arquivo_entrada)
