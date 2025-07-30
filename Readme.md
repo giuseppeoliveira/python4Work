@@ -1,71 +1,138 @@
+# 🚀 **Python4Work - Ferramenta Profissional de Automação**
 
-# 📊 EasyCollector Automation – Instruções de Uso
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://python.org)
+[![Interface](https://img.shields.io/badge/Interface-Professional-green.svg)](interface_profissional.py)
+[![Status](https://img.shields.io/badge/Status-Enterprise%20Ready-brightgreen.svg)]()
 
-Este projeto automatiza a consulta de informações de dívida ativa e status de acordo para uma lista de CPFs em um arquivo Excel. O processo é dividido em duas etapas (dois scripts):
-
----
-
-## ✅ ETAPA 1 – Obter Dívida por CPF
-
-**Script:** `obter_divida_cpf.py`  
-**Objetivo:** Consultar a dívida ativa de cada CPF da planilha e preencher os campos `cod_cliente`, `cod_acordo`, `status`, e `observacao`.
-
-### Como usar:
-
-1. **Abrir o script `obter_divida_cpf.py`.**
-2. **Selecionar o arquivo Excel (.xlsx)** com os CPFs que deseja consultar.
-   - A planilha deve conter a coluna chamada exatamente `cpf`.
-3. O script realizará as consultas automaticamente e preencherá os seguintes campos:
-   - `cod_cliente`
-   - `cod_acordo`
-   - `status` (`Encontrado`, `Investigar`, etc.)
-   - `observacao` (`Encontrado com sucesso`, `Não encontrado`, etc.)
-4. O Excel será salvo automaticamente a cada linha processada no local especificado por você.
-5. Um log de erros será salvo como `log_obter_divida.txt` na mesma pasta do Excel.
-6. Ao final, será exibido um resumo das ocorrências por status.
+**🎯 Solução empresarial para automação de consultas e processamento de dados**
 
 ---
 
-## ✅ ETAPA 2 – Consultar Acordo
+## ⚡ **INÍCIO RÁPIDO**
 
-**Script:** `consultar_acordo.py`  
-**Objetivo:** Consultar o status do acordo usando os campos `cod_cliente` e `cod_acordo` preenchidos na Etapa 1.
+### **1. Configure suas credenciais:**
+```bash
+cp .env.example .env
+# Edite o .env com suas credenciais
+```
 
-### Como usar:
+### **2. Instale as dependências:**
+```bash
+pip install -r requirements.txt
+```
 
-1. **Rodar o script `consultar_acordo.py`.**
-2. **Selecionar o arquivo Excel que foi salvo na Etapa 1.**
-   - Ele deve conter as colunas `cod_cliente` e `cod_acordo`.
-3. O script fará uma consulta ao status do acordo e preencherá a nova coluna:
-   - `status_acordo`
-4. O Excel será salvo continuamente durante o processo.
-5. Um log de erros será salvo como `log_consultar_acordo.txt`.
-6. Barra de progresso e contadores de linhas processadas estão incluídos na interface.
-
----
-
-## 🔄 Requisitos
-
-- Python 3.9 ou superior.
-- Pacotes necessários (instalar com `pip install` se necessário):
-  ```bash
-  pip install pandas requests beautifulsoup4 openpyxl
-  ```
+### **3. Execute a interface profissional:**
+```bash
+python interface_profissional.py
+```
 
 ---
 
-## 📝 Observações
+## 🌟 **Versões Disponíveis**
 
-- Certifique-se de que os arquivos Excel não estejam abertos no Excel durante o processamento para evitar erros de permissão.
-- O botão “Parar” salva o progresso atual antes de interromper.
-- O botão “Cancelar” encerra sem salvar os dados processados.
-- Em caso de erro HTTP, timeouts ou respostas inválidas, o log detalhado indicará linha por linha.
+### **🚀 PROFISSIONAL (Recomendada)**
+```bash
+python interface_profissional.py
+```
+- Interface moderna com logging avançado
+- 4 temas profissionais
+- Sistema de configuração dinâmica
+- Validação robusta de dados
+- Monitoramento de sessões
+
+### **📋 UNIFICADA (Alternativa)**
+```bash
+python interface_unificada.py
+```
+- Interface simples e direta
+- Todas as 4 funcionalidades integradas
+- Geração automática de modelos
+
+### **⚙️ SCRIPTS INDIVIDUAIS (Legado)**
+```bash
+python consultar_acordo.py
+python obter_divida_cpf.py
+python extrair_json_corpo_requisicao.py
+python conversor_csv_xlsx.py
+```
 
 ---
 
-## 📁 Arquivos Gerados
+## 🎯 **4 Funcionalidades Integradas**
 
-- Excel atualizado com os resultados (na pasta escolhida).
-- Logs:
-  - `log_obter_divida.txt`
-  - `log_consultar_acordo.txt`
+| Função | Descrição | Entrada | Saída |
+|--------|-----------|---------|--------|
+| 📋 **Consultar Acordo** | Status de acordos | `cod_cliente` + `cod_acordo` | Status do acordo |
+| 🔍 **Obter Dívida CPF** | Dívida ativa por CPF | Lista de CPFs | Dados completos |
+| 📄 **Extrair JSON** | Estrutura dados JSON | `corpo_requisicao` | Dados organizados |
+| 📁 **Converter CSV** | CSV para XLSX | Arquivos CSV | Planilhas Excel |
+
+---
+
+## 🔧 **Recursos Avançados**
+
+- 🎨 **4 Temas:** Moderno, Escuro, Corporativo, Natureza
+- 📊 **Logging Completo:** Rastreamento de todas as operações
+- ✅ **Validação CPF:** Dígitos verificadores incluídos
+- 🔐 **Segurança:** Credenciais protegidas com `.env`
+- ⚙️ **Configurável:** Arquivo `config.json` automático
+- 📈 **Monitoramento:** Relatórios de sessão detalhados
+
+---
+
+## 📁 **Estrutura Simplificada**
+
+```
+python4Work/
+├── 🚀 interface_profissional.py      # ← EXECUTE ESTE!
+├── 📋 interface_unificada.py          # Alternativa simples
+├── ⚙️ config.json                    # Configurações (auto-criado)
+├── 🔐 .env                           # Suas credenciais
+├── 📦 requirements.txt               # Dependências
+└── 📝 logs/                          # Monitoramento
+```
+
+---
+
+## 🆘 **Solução Rápida de Problemas**
+
+**Erro de credenciais?**
+```bash
+cp .env.example .env
+# Edite o .env com LOGIN, SENHA, URL, URL_DIVIDA
+```
+
+**Erro de importação?**
+```bash
+pip install -r requirements.txt
+```
+
+**Interface não abre?**
+```bash
+python interface_profissional.py
+# Verifique: logs/python4workpro_errors.log
+```
+
+---
+
+## 📖 **Documentação Completa**
+
+- 📋 **README Completo:** `README_PROFISSIONAL.md`
+- 🔒 **Segurança:** `SECURITY.md`
+- 📊 **Melhorias:** `MELHORIAS_PROFISSIONAIS.md`
+- 📝 **Interface Unificada:** `README_UNIFICADO.md`
+
+---
+
+## 🏆 **Status: COMPLETAMENTE PROFISSIONAL**
+
+✅ **Nível Enterprise** - Pronto para produção  
+✅ **Interface Moderna** - Design profissional  
+✅ **Monitoramento Total** - Logs estruturados  
+✅ **Segurança Avançada** - Credenciais protegidas  
+✅ **Documentação Completa** - Guias detalhados  
+
+**🚀 COMANDO PARA INICIAR:**
+```bash
+python interface_profissional.py
+```

@@ -1,0 +1,40 @@
+{
+    "app": {
+        "name": "Python4Work Professional",
+        "version": "2.0.0",
+        "theme": "modern",
+        "language": "pt_BR",
+        "auto_backup": true,
+        "backup_interval": 10,
+        "max_retries": 3,
+        "timeout_seconds": 30
+    },
+    "ui": {
+        "window_width": 1000,
+        "window_height": 700,
+        "show_tooltips": true,
+        "show_progress_details": true,
+        "animate_progress": true,
+        "confirm_exit": true
+    },
+    "logging": {
+        "level": "WARNING",
+        "max_file_size_mb": 10,
+        "backup_count": 5,
+        "log_to_console": true,
+        "log_to_file": true,
+        "detailed_errors": true
+    },
+    "security": {
+        "mask_credentials": true,
+        "require_env_file": true,
+        "validate_ssl": true,
+        "session_timeout": 3600
+    },
+    "performance": {
+        "batch_size": 100,
+        "thread_pool_size": 4,
+        "memory_limit_mb": 512,
+        "enable_caching": true
+    }
+}

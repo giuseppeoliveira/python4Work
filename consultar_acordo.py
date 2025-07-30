@@ -8,10 +8,18 @@ import threading
 import time
 import os
 import re
+from dotenv import load_dotenv
 
-LOGIN = "FFWS"
-SENHA = "rHapRFkDgj5z5je6EHUf"
-URL = "http://54.83.29.48/easycollectorws/easycollectorWs.asmx/ConsultarAcordo"
+# Carrega as variáveis de ambiente do arquivo .env
+load_dotenv()
+
+LOGIN = os.getenv("LOGIN")
+SENHA = os.getenv("SENHA")
+URL = os.getenv("URL")
+
+# Verifica se as variáveis de ambiente foram carregadas
+if not all([LOGIN, SENHA, URL]):
+    raise ValueError("❌ Erro: Variáveis de ambiente não encontradas. Verifique o arquivo .env")
 
 parar_flag = threading.Event()
 linhas_processadas = 0

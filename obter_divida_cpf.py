@@ -7,9 +7,19 @@ import threading
 import time
 import re
 import unicodedata
+import os
+from dotenv import load_dotenv
 
-LOGIN_FIXO = "FFWS"
-SENHA_FIXO = "rHapRFkDgj5z5je6EHUf"
+# Carrega as variáveis de ambiente do arquivo .env
+load_dotenv()
+
+LOGIN_FIXO = os.getenv("LOGIN")
+SENHA_FIXO = os.getenv("SENHA")
+URL_DIVIDA = os.getenv("URL_DIVIDA", "http://54.83.29.48/easycollectorws/easycollectorWs.asmx/ObterDividaAtivaPorCPF")
+
+# Verifica se as variáveis de ambiente foram carregadas
+if not all([LOGIN_FIXO, SENHA_FIXO]):
+    raise ValueError("❌ Erro: Variáveis de ambiente LOGIN e SENHA não encontradas. Verifique o arquivo .env")
 
 parar_evento = threading.Event()
 cancelar_evento = threading.Event()
@@ -27,14 +37,13 @@ def limpar_cpf(cpf_raw):
     return cpf_limpo.zfill(11) if cpf_limpo else ""
 
 def consultar_easycollector(cpf, login, senha):
-    url = "http://54.83.29.48/easycollectorws/easycollectorWs.asmx/ObterDividaAtivaPorCPF"
     payload = {
         "logonUsuario": login,
         "senhaUsuario": senha,
         "cpfCnpj": cpf
     }
     try:
-        response = requests.post(url, data=payload, timeout=10)
+        response = requests.post(URL_DIVIDA, data=payload, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, "xml")
         body_text = soup.get_text()
