@@ -960,73 +960,78 @@ class Python4WorkPro:
         thread.start()
     
     def executar_obter_divida(self, arquivo_entrada, arquivo_saida):
-        """Executa obtenção de dívida por CPF"""
+        """Executa obtenção de dívida por CPF usando a função otimizada"""
         try:
-            # Importar função do script original
-            from src.obter_divida_cpf import consultar_easycollector
+            # Importar função otimizada
+            from src.obter_divida_cpf import processar_batch_cpf
+            import pandas as pd
+            import time
             
             # Ler arquivo
-            df = pd.read_excel(arquivo_entrada)
-            total_linhas = len(df)
+            df = pd.read_excel(arquivo_entrada, engine='openpyxl', dtype=str)
+            # Limpar nomes das colunas
+            df.columns = df.columns.str.strip().str.lower()
             
-            self.atualizar_progresso(0, f"Iniciando processamento de {total_linhas} CPFs...")
-            
-            # Verificar coluna CPF
-            if 'cpf' not in df.columns:
+            # Verificar se tem coluna CPF
+            if "cpf" not in df.columns:
                 messagebox.showerror("Erro", "Arquivo deve conter coluna 'cpf'")
                 self.voltar_menu()
                 return
             
-            # Adicionar colunas de resultado se não existirem
+            # Preencher valores vazios e adicionar colunas necessárias
+            df.fillna("0", inplace=True)
             for col in ['cod_cliente', 'cod_acordo', 'status', 'observacao']:
                 if col not in df.columns:
-                    df[col] = ''
+                    df[col] = "0"
             
-            # Processar cada linha
-            for idx, row in df.iterrows():
+            total = len(df)
+            batch_size = 25
+            linhas_processadas = 0
+            tempo_inicio = time.time()
+            
+            self.atualizar_progresso(0, f"Iniciando processamento de {total} CPFs...")
+            
+            # Processar em lotes
+            for batch_start in range(0, total, batch_size):
                 if self.cancelar_flag.is_set():
                     break
                 
                 if self.parar_flag.is_set():
-                    self.atualizar_progresso((idx/total_linhas)*100, "Processo pausado...")
+                    self.atualizar_progresso((linhas_processadas/total)*100, "Processo pausado...")
                     self.parar_flag.wait()
                 
-                try:
-                    cpf = str(row['cpf']).strip()
-                    
-                    # Validar CPF
-                    if not self.validator.validate_cpf(cpf):
-                        df.at[idx, 'status'] = 'CPF Inválido'
-                        df.at[idx, 'observacao'] = 'CPF não passou na validação'
-                        continue
-                    
-                    # Consultar dívida
-                    resultado = consultar_easycollector(cpf, LOGIN, SENHA)
-                    
-                    if resultado and len(resultado) >= 4:
-                        df.at[idx, 'cod_cliente'] = resultado[0]
-                        df.at[idx, 'cod_acordo'] = resultado[1]
-                        df.at[idx, 'status'] = resultado[2]
-                        df.at[idx, 'observacao'] = resultado[3]
-                    else:
-                        df.at[idx, 'status'] = 'Não encontrado'
-                        df.at[idx, 'observacao'] = 'CPF não retornou dados'
-                    
-                    # Atualizar progresso
-                    progresso = ((idx + 1) / total_linhas) * 100
-                    self.atualizar_progresso(progresso, f"Processando CPF {idx + 1}/{total_linhas}")
-                    
-                    # Salvar periodicamente
-                    if (idx + 1) % 5 == 0:
-                        df.to_excel(arquivo_saida, index=False)
-                    
-                except Exception as e:
-                    self.logger.error(f"Erro no CPF linha {idx + 1}: {e}")
-                    df.at[idx, 'status'] = 'ERRO'
-                    df.at[idx, 'observacao'] = f"Erro: {str(e)}"
+                batch_end = min(batch_start + batch_size, total)
+                batch_rows = [(i, df.iloc[i]) for i in range(batch_start, batch_end)]
+                
+                # Processar lote em paralelo
+                batch_results = processar_batch_cpf(batch_rows)
+                
+                # Atualizar DataFrame com resultados
+                for i, status, observacao, cod_cliente, cod_acordo in batch_results:
+                    df.at[i, "status"] = status
+                    df.at[i, "observacao"] = observacao
+                    df.at[i, "cod_cliente"] = cod_cliente
+                    df.at[i, "cod_acordo"] = cod_acordo
+                    linhas_processadas += 1
+                
+                # Atualizar progresso
+                progresso = (linhas_processadas / total) * 100
+                
+                # Calcular tempo estimado
+                tempo_passado = time.time() - tempo_inicio
+                if linhas_processadas > 0:
+                    tempo_estimado_restante = (tempo_passado / linhas_processadas) * (total - linhas_processadas)
+                    minutos = int(tempo_estimado_restante // 60)
+                    self.atualizar_progresso(progresso, f"Processando: {linhas_processadas}/{total} - {minutos}m restantes")
+                else:
+                    self.atualizar_progresso(progresso, f"Processando: {linhas_processadas}/{total}")
+                
+                # Salvar progresso a cada 100 linhas
+                if linhas_processadas % 100 == 0:
+                    df.to_excel(arquivo_saida, index=False, engine='openpyxl')
             
-            # Salvar resultado final
-            df.to_excel(arquivo_saida, index=False)
+            # Salvar arquivo final
+            df.to_excel(arquivo_saida, index=False, engine='openpyxl')
             
             if not self.cancelar_flag.is_set():
                 self.atualizar_progresso(100, "Processamento concluído!")

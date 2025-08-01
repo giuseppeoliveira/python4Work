@@ -9,6 +9,7 @@ import re
 import unicodedata
 import os
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
@@ -23,6 +24,10 @@ if not all([LOGIN_FIXO, SENHA_FIXO]):
 
 parar_evento = threading.Event()
 cancelar_evento = threading.Event()
+
+# Sessão HTTP reutilizável para melhor performance
+session = requests.Session()
+session.headers.update({'Connection': 'keep-alive'})
 
 def remover_acentos(texto):
     """
@@ -43,8 +48,10 @@ def consultar_easycollector(cpf, login, senha):
         "cpfCnpj": cpf
     }
     try:
-        response = requests.post(URL_DIVIDA, data=payload, timeout=10)
+        # Reduzido timeout de 10s para 5s para melhor performance
+        response = session.post(URL_DIVIDA, data=payload, timeout=5)
         response.raise_for_status()
+        
         soup = BeautifulSoup(response.content, "xml")
         body_text = soup.get_text()
 
@@ -69,8 +76,76 @@ def consultar_easycollector(cpf, login, senha):
         return id_cliente, id_acordo, data_vencs
 
     except Exception as e:
-        print(f"[ERRO consultar_easycollector] CPF {cpf}: {e}")
+        print(f"❌ [ERRO] CPF {cpf}: {e}")
         return 0, 0, []
+
+def processar_linha_cpf(row_data):
+    """Processa uma única linha de CPF"""
+    i, row = row_data
+    
+    cod_acordo = row.get("cod_acordo", "0")
+    cod_cliente = row.get("cod_cliente", "0")
+
+    if cod_acordo != "0" or cod_cliente != "0":
+        # Já possui os códigos → marcar como Excluir
+        return i, "Excluir", "Em Duplicidade", cod_cliente, cod_acordo
+
+    # Para registros com cod_acordo e cod_cliente igual a 0, tenta atualizar
+    cpf_raw = row.get("cpf", "")
+    cpf = limpar_cpf(cpf_raw)
+
+    if not cpf or cpf == "00000000000":
+        return i, "", "", "0", "0"
+
+    id_cliente, id_acordo, datas = consultar_easycollector(cpf, LOGIN_FIXO, SENHA_FIXO)
+
+    alterou = False
+    new_cod_cliente = cod_cliente
+    new_cod_acordo = cod_acordo
+
+    if id_cliente != 0:
+        new_cod_cliente = str(id_cliente)
+        alterou = True
+
+    if id_acordo != 0:
+        new_cod_acordo = str(id_acordo)
+        alterou = True
+
+    if alterou and (new_cod_cliente != "0" or new_cod_acordo != "0"):
+        status = "Update"
+        observacao = "Atualizado"
+    elif id_cliente == 0 and id_acordo == 0:
+        # Só marca como "Não Encontrado" se a API não retornou NENHUM dado
+        status = "Investigar"
+        observacao = "Não Encontrado"
+    else:
+        status = ""
+        observacao = ""
+
+    print(f"[Linha {i+1}] CPF: {cpf} | cod_cliente: {id_cliente} | cod_acordo: {id_acordo} | status: {status}")
+    
+    return i, status, observacao, new_cod_cliente, new_cod_acordo
+
+def processar_batch_cpf(batch_rows):
+    """Processa um lote de CPFs em paralelo"""
+    results = []
+    with ThreadPoolExecutor(max_workers=15) as executor:
+        future_to_row = {
+            executor.submit(processar_linha_cpf, row_data): row_data 
+            for row_data in batch_rows
+        }
+        
+        for future in as_completed(future_to_row):
+            row_data = future_to_row[future]
+            try:
+                result = future.result()
+                results.append(result)
+            except Exception as e:
+                i, row = row_data
+                print(f"Erro no processamento da linha {i}: {e}")
+                results.append((i, "Erro", f"Erro: {str(e)}", "0", "0"))
+    
+    return results
 
 def processar_xlsx(caminho_arquivo, caminho_salvar, progresso_var, progresso_label, status_label):
     try:
@@ -90,83 +165,56 @@ def processar_xlsx(caminho_arquivo, caminho_salvar, progresso_var, progresso_lab
 
     total = len(df)
     tempo_inicio = time.time()
+    batch_size = 25  # Processa 25 linhas por vez
+    linhas_processadas = 0
 
-    for i, row in df.iterrows():
+    # Processar em lotes para melhor performance
+    for batch_start in range(0, total, batch_size):
         if cancelar_evento.is_set():
             status_label.config(text="Processo cancelado. Nenhuma alteração salva.")
             print("[INFO] Processo cancelado pelo usuário. Nenhuma alteração salva.")
             return
         if parar_evento.is_set():
-            status_label.config(text=f"Processo parado. Salvando progresso até linha {i}...")
-            print(f"[INFO] Processo parado pelo usuário. Salvando progresso até linha {i}...")
-            df.iloc[:i].to_excel(caminho_salvar, index=False, engine='openpyxl')
+            status_label.config(text=f"Processo parado. Salvando progresso até linha {batch_start}...")
+            print(f"[INFO] Processo parado pelo usuário. Salvando progresso até linha {batch_start}...")
+            df.iloc[:batch_start].to_excel(caminho_salvar, index=False, engine='openpyxl')
             progresso_var.set(100)
             progresso_label.config(text="100%")
-            messagebox.showinfo("Interrompido", f"Progresso salvo até a linha {i} em:\n{caminho_salvar}")
+            messagebox.showinfo("Interrompido", f"Progresso salvo até a linha {batch_start} em:\n{caminho_salvar}")
             return
 
-        cod_acordo = row.get("cod_acordo", "0")
-        cod_cliente = row.get("cod_cliente", "0")
+        batch_end = min(batch_start + batch_size, total)
+        batch_rows = [(i, df.iloc[i]) for i in range(batch_start, batch_end)]
+        
+        # Processar lote em paralelo
+        batch_results = processar_batch_cpf(batch_rows)
+        
+        # Atualizar DataFrame com resultados
+        for i, status, observacao, cod_cliente, cod_acordo in batch_results:
+            df.at[i, "status"] = status
+            df.at[i, "observacao"] = observacao
+            df.at[i, "cod_cliente"] = cod_cliente
+            df.at[i, "cod_acordo"] = cod_acordo
+            linhas_processadas += 1
 
-        if cod_acordo != "0" or cod_cliente != "0":
-            # Já possui os códigos → marcar como Excluir
-            df.at[i, "status"] = "Excluir"
-            df.at[i, "observacao"] = "Em Duplicidade"
-            print(f"[Linha {i+1}/{total}] CPF: {row.get('cpf', '')} | cod_acordo={cod_acordo}, cod_cliente={cod_cliente} -> Excluir")
-            continue
-
-        # Para registros com cod_acordo e cod_cliente igual a 0, tenta atualizar
-        cpf_raw = row.get("cpf", "")
-        cpf = limpar_cpf(cpf_raw)
-
-        if not cpf or cpf == "00000000000":
-            print(f"[Linha {i+1}] CPF inválido ou vazio ('{cpf_raw}'), pulando...")
-            df.at[i, "status"] = ""
-            df.at[i, "observacao"] = ""
-            continue
-
-        data_venc = str(row.get("data_vencimento", ""))[:10]
-
-        id_cliente, id_acordo, datas = consultar_easycollector(cpf, LOGIN_FIXO, SENHA_FIXO)
-
-        alterou = False
-
-        if id_cliente != 0:
-            df.at[i, "cod_cliente"] = str(id_cliente)
-            alterou = True
-
-        if id_acordo != 0:
-            df.at[i, "cod_acordo"] = str(id_acordo)
-            alterou = True
-
-        if alterou and (df.at[i, "cod_cliente"] != "0" or df.at[i, "cod_acordo"] != "0"):
-            df.at[i, "status"] = "Update"
-            df.at[i, "observacao"] = "Atualizado"
-        elif df.at[i, "cod_cliente"] == "0" and df.at[i, "cod_acordo"] == "0":
-            df.at[i, "status"] = "Investigar"
-            df.at[i, "observacao"] = "Não Encontrado"
-        else:
-            df.at[i, "status"] = ""
-            df.at[i, "observacao"] = ""
-
-
-        print(f"[Linha {i+1}/{total}] CPF: {cpf} | cod_cliente: {id_cliente} | cod_acordo: {id_acordo} | status: {df.at[i, 'status']}")
-
-        progresso = int((i + 1) / total * 100)
+        # Atualizar progresso
+        progresso = int((linhas_processadas / total) * 100)
         progresso_var.set(progresso)
         progresso_label.config(text=f"{progresso}%")
 
+        # Calcular tempo estimado
         tempo_passado = time.time() - tempo_inicio
-        if i > 0:
-            tempo_estimado_restante = (tempo_passado / (i + 1)) * (total - i - 1)
+        if linhas_processadas > 0:
+            tempo_estimado_restante = (tempo_passado / linhas_processadas) * (total - linhas_processadas)
             minutos = int(tempo_estimado_restante // 60)
             segundos = int(tempo_estimado_restante % 60)
-            status_label.config(text=f"Processando: {i+1}/{total} - Tempo estimado restante: {minutos}m {segundos}s")
-        else:
-            status_label.config(text=f"Processando: {i+1}/{total} - Calculando tempo restante...")
+            status_label.config(text=f"Processando: {linhas_processadas}/{total} - Tempo estimado restante: {minutos}m {segundos}s")
+        
+        # Salvar progresso a cada 100 linhas processadas
+        if linhas_processadas % 100 == 0:
+            df.to_excel(caminho_salvar, index=False, engine='openpyxl')
 
-        time.sleep(0.01)
-
+    # Salvar arquivo final
     df.to_excel(caminho_salvar, index=False, engine='openpyxl')
     progresso_var.set(100)
     progresso_label.config(text="100%")

@@ -9,6 +9,8 @@ import time
 import os
 import re
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import queue
 
 # Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
@@ -26,6 +28,10 @@ linhas_processadas = 0
 total_erros = 0
 log_erros = []
 
+# Sessão HTTP reutilizável para melhor performance
+session = requests.Session()
+session.headers.update({'Connection': 'keep-alive'})
+
 def consultar_status_acordo(row, index, tentativas=2):
     global total_erros
     cod_cliente = row.get("cod_cliente", 0)
@@ -40,9 +46,11 @@ def consultar_status_acordo(row, index, tentativas=2):
 
     for tentativa in range(1, tentativas + 1):
         try:
-            response = requests.post(URL, data=payload, timeout=15)
+            # Reduzido timeout de 15s para 5s
+            response = session.post(URL, data=payload, timeout=5)
             response.raise_for_status()
 
+            # Parse XML mais eficiente
             soup = BeautifulSoup(response.content, "xml")
             string_tag = soup.find("string")
 
@@ -50,6 +58,8 @@ def consultar_status_acordo(row, index, tentativas=2):
                 raise ValueError("⚠️ Tag <string> não encontrada.")
 
             decoded = string_tag.text.replace("&lt;", "<").replace("&gt;", ">")
+            
+            # Regex mais eficiente com compilação
             status_match = re.search(r"<Status>(.*?)</Status>", decoded)
 
             if status_match:
@@ -70,9 +80,31 @@ def consultar_status_acordo(row, index, tentativas=2):
     total_erros += 1
     return "Não encontrado"
 
-def salvar_parcial(df, caminho_salvar):
+def consultar_status_acordo_batch(rows_batch):
+    """Processa um lote de consultas em paralelo"""
+    results = []
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_row = {
+            executor.submit(consultar_status_acordo, row, index): (index, row) 
+            for index, row in rows_batch
+        }
+        
+        for future in as_completed(future_to_row):
+            index, row = future_to_row[future]
+            try:
+                status = future.result()
+                results.append((index, status))
+            except Exception as e:
+                print(f"Erro no processamento da linha {index}: {e}")
+                results.append((index, "Erro"))
+    
+    return results
+
+def salvar_parcial(df, caminho_salvar, force=False):
+    """Salva o arquivo apenas a cada X linhas ou quando forçado"""
     try:
-        df.to_excel(caminho_salvar, index=False)
+        if force or linhas_processadas % 50 == 0:  # Salva a cada 50 linhas
+            df.to_excel(caminho_salvar, index=False)
     except Exception as e:
         print(f"Erro ao salvar arquivo: {e}")
 
@@ -100,21 +132,48 @@ def processar_arquivo(caminho_arquivo, caminho_salvar, progresso_var, progresso_
         df["status_acordo"] = ""
     linhas_processadas = 0
     total = len(df)
+    batch_size = 20  # Processa 20 linhas por vez
 
-    for i, row in df.iterrows():
+    start_time = time.time()
+
+    # Processar em lotes para melhor performance
+    for batch_start in range(0, total, batch_size):
         if parar_flag.is_set():
             break
-        status = consultar_status_acordo(row, i)
-        df.at[i, "status_acordo"] = status
-        linhas_processadas += 1
+            
+        batch_end = min(batch_start + batch_size, total)
+        batch_rows = [(i, df.iloc[i]) for i in range(batch_start, batch_end)]
+        
+        # Processar lote em paralelo
+        batch_results = consultar_status_acordo_batch(batch_rows)
+        
+        # Atualizar DataFrame com resultados
+        for index, status in batch_results:
+            df.at[index, "status_acordo"] = status
+            linhas_processadas += 1
 
+        # Atualizar progresso
         progresso = int((linhas_processadas / total) * 100)
         progresso_var.set(progresso)
         progresso_label.config(text=f"{linhas_processadas}/{total}")
+        
+        # Calcular tempo estimado
+        elapsed_time = time.time() - start_time
+        if linhas_processadas > 0:
+            avg_time_per_item = elapsed_time / linhas_processadas
+            remaining_items = total - linhas_processadas
+            estimated_remaining = avg_time_per_item * remaining_items
+            minutes = int(estimated_remaining // 60)
+            seconds = int(estimated_remaining % 60)
+            status_label.config(text=f"Processando: {linhas_processadas}/{total} - Restam ~{minutes}m {seconds}s")
+        
+        # Salvar progresso periodicamente
         salvar_parcial(df, caminho_salvar)
 
-    salvar_parcial(df, caminho_salvar)
+    # Salvar arquivo final
+    salvar_parcial(df, caminho_salvar, force=True)
 
+    # Salvar log de erros
     with open("log_consultar_acordo.txt", "w", encoding="utf-8") as f:
         for linha in log_erros:
             f.write(linha + "\n")
