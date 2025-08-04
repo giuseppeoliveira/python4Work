@@ -204,6 +204,7 @@ class Python4WorkPro:
         # Configurar grid responsivo - 2 colunas em telas normais, 1 em telas pequenas
         cards_container.grid_rowconfigure(0, weight=1)
         cards_container.grid_rowconfigure(1, weight=1)
+        cards_container.grid_rowconfigure(2, weight=1)
         cards_container.grid_columnconfigure(0, weight=1, minsize=300)  # Largura mínima
         cards_container.grid_columnconfigure(1, weight=1, minsize=300)  # Largura mínima
         
@@ -240,6 +241,14 @@ class Python4WorkPro:
                 'cor': 'accent',
                 'comando': self.abrir_conversor,
                 'row': 1, 'col': 1
+            },
+            {
+                'titulo': '🎯 Resolver Duplicatas',
+                'descricao': 'Resolve duplicatas com regras inteligentes: data_pagamento, cod_acordo e cod_prestacao',
+                'icone': '🎯',
+                'cor': 'primary',
+                'comando': self.abrir_filtrar_duplicatas,
+                'row': 2, 'col': 0
             }
         ]
         
@@ -707,11 +716,12 @@ class Python4WorkPro:
         
         # Janela de opções
         opcao = messagebox.askyesnocancel(
-            "Consultar Acordo",
+            "Consultar Acordo ⚡ OTIMIZADO",
             "Escolha uma opção:\n\n"
             "✅ SIM - Baixar modelo Excel primeiro\n"
             "❌ NÃO - Usar arquivo existente\n"
-            "🚫 CANCELAR - Voltar ao menu"
+            "🚫 CANCELAR - Voltar ao menu\n\n"
+            "⚡ Versão otimizada: 4-5x mais rápida!"
         )
         
         if opcao is None:  # Cancelar
@@ -796,20 +806,30 @@ class Python4WorkPro:
         thread.start()
     
     def executar_consultar_acordo(self, arquivo_entrada, arquivo_saida):
-        """Executa consulta de acordo"""
+        """Executa consulta de acordo com validação robusta e processamento otimizado"""
         try:
-            # Importar função do script original
-            from src.consultar_acordo import consultar_status_acordo
+            # Importar funções melhoradas do script
+            from src.consultar_acordo import consultar_status_acordo_batch, validar_dados_entrada
+            
+            self.atualizar_progresso(5, f"📂 Carregando arquivo...")
             
             # Ler arquivo
             df = pd.read_excel(arquivo_entrada)
             total_linhas = len(df)
             
-            self.atualizar_progresso(0, f"Iniciando processamento de {total_linhas} registros...")
+            self.logger.info(f"Consultar Acordo: Arquivo carregado - {total_linhas} registros")
             
-            # Verificar colunas necessárias
-            if not all(col in df.columns for col in ['cod_cliente', 'cod_acordo']):
-                messagebox.showerror("Erro", "Arquivo deve conter colunas 'cod_cliente' e 'cod_acordo'")
+            # Validar dados de entrada com nova função robusta
+            self.atualizar_progresso(10, f"� Validando {total_linhas} registros...")
+            
+            try:
+                registros_validos_esperados = validar_dados_entrada(df)
+                self.logger.info(f"Consultar Acordo: Validação OK - {registros_validos_esperados} registros válidos esperados")
+            except Exception as validation_error:
+                error_msg = f"❌ Erro na validação: {validation_error}"
+                self.logger.error(f"Consultar Acordo: {error_msg}")
+                self.atualizar_progresso(0, error_msg)
+                messagebox.showerror("Erro de Validação", str(validation_error))
                 self.voltar_menu()
                 return
             
@@ -817,46 +837,72 @@ class Python4WorkPro:
             if 'status_acordo' not in df.columns:
                 df['status_acordo'] = ''
             
-            # Processar cada linha
-            for idx, row in df.iterrows():
+            self.atualizar_progresso(15, f"🚀 Iniciando consultas otimizadas...")
+            
+            # Configurações otimizadas
+            batch_size = 50
+            max_workers = 25
+            linhas_processadas = 0
+            
+            import time
+            start_time = time.time()
+            
+            # Processar em lotes para melhor performance
+            for batch_start in range(0, total_linhas, batch_size):
+                # Verificar flags de controle
                 if self.cancelar_flag.is_set():
+                    self.atualizar_progresso((batch_start/total_linhas)*100, "❌ Processo cancelado...")
                     break
-                
+                    
                 if self.parar_flag.is_set():
-                    self.atualizar_progresso((idx/total_linhas)*100, "Processo pausado...")
+                    self.atualizar_progresso((batch_start/total_linhas)*100, "⏸️ Processo pausado...")
                     self.parar_flag.wait()
                 
-                try:
-                    cod_cliente = str(row['cod_cliente']).strip()
-                    cod_acordo = str(row['cod_acordo']).strip()
-                    
-                    # Consultar acordo (função espera row e index)
-                    status = consultar_status_acordo(row, idx)
-                    df.at[idx, 'status_acordo'] = status
-                    
-                    # Atualizar progresso
-                    progresso = ((idx + 1) / total_linhas) * 100
-                    self.atualizar_progresso(progresso, f"Processando linha {idx + 1}/{total_linhas}")
-                    
-                    # Salvar periodicamente
-                    if (idx + 1) % 5 == 0:
-                        df.to_excel(arquivo_saida, index=False)
-                    
-                except Exception as e:
-                    self.logger.error(f"Erro na linha {idx + 1}: {e}")
-                    df.at[idx, 'status_acordo'] = f"ERRO: {str(e)}"
+                batch_end = min(batch_start + batch_size, total_linhas)
+                batch_rows = [(i, df.iloc[i]) for i in range(batch_start, batch_end)]
+                
+                # Atualizar progresso
+                progresso = int((batch_start / total_linhas) * 100)
+                elapsed = time.time() - start_time
+                if batch_start > 0:
+                    eta = (elapsed / batch_start) * (total_linhas - batch_start)
+                    self.atualizar_progresso(progresso, 
+                        f"⚡ Processando lote {batch_start//batch_size + 1}: {batch_start+1}-{batch_end} de {total_linhas} | ETA: {eta/60:.1f}min")
+                else:
+                    self.atualizar_progresso(progresso, f"🔄 Processando lote 1: {batch_start+1}-{batch_end} de {total_linhas}")
+                
+                # Processar lote em paralelo
+                batch_results = consultar_status_acordo_batch(batch_rows, max_workers)
+                
+                # Atualizar DataFrame com resultados
+                for index, status in batch_results:
+                    df.at[index, "status_acordo"] = status
+                    linhas_processadas += 1
+                
+                # Salvar progresso periodicamente
+                if linhas_processadas % 100 == 0:
+                    df.to_excel(arquivo_saida, index=False)
             
-            # Salvar resultado final
+            # Salvar arquivo final
             df.to_excel(arquivo_saida, index=False)
             
-            if not self.cancelar_flag.is_set():
-                self.atualizar_progresso(100, "Processamento concluído!")
-                messagebox.showinfo("Sucesso", f"Arquivo salvo: {arquivo_saida}")
+            # Calcular estatísticas finais
+            total_time = time.time() - start_time
+            req_per_sec = linhas_processadas / total_time if total_time > 0 else 0
+            
+            self.atualizar_progresso(100, 
+                f"✅ Concluído! {linhas_processadas} registros em {total_time/60:.1f}min ({req_per_sec:.1f} req/s)")
+            
+            messagebox.showinfo("Sucesso", 
+                f"Processamento concluído!\n\n"
+                f"📊 Registros processados: {linhas_processadas}\n"
+                f"⏱️ Tempo total: {total_time/60:.1f} minutos\n"
+                f"⚡ Velocidade: {req_per_sec:.1f} req/s\n"
+                f"📁 Arquivo salvo: {arquivo_saida}")
             
         except Exception as e:
             self.logger.critical(f"Erro crítico em consultar acordo: {e}")
-            messagebox.showerror("Erro", f"Erro no processamento: {e}")
-        
+            messagebox.showerror("Erro", f"Erro durante processamento: {str(e)}")
         finally:
             self.voltar_menu()
     
@@ -1277,6 +1323,186 @@ class Python4WorkPro:
             messagebox.showerror("Erro", f"Erro na conversão: {e}")
         
         finally:
+            self.voltar_menu()
+
+    def abrir_filtrar_duplicatas(self):
+        """Abre interface para resolver duplicatas com regras inteligentes"""
+        self.logger.log_user_action("Resolver Duplicatas: Interface aberta")
+        
+        # Mostrar área de progresso com o nome da operação
+        self.mostrar_progresso("Resolver Duplicatas")
+        
+        # Habilitar controles
+        self.btn_parar.config(state="normal")
+        self.btn_cancelar.config(state="normal")
+        
+        # Janela de opções
+        opcao = messagebox.askyesnocancel(
+            "Resolver Duplicatas 🔄",
+            "Escolha uma opção:\n\n"
+            "✅ SIM - Usar arquivo de exemplo para testar\n"
+            "❌ NÃO - Selecionar meu próprio arquivo\n"
+            "🚫 CANCELAR - Voltar ao menu\n\n"
+            "📋 Arquivo deve ter colunas: 'cpf', 'data_vencimento', 'numero_prestacao', 'cod_prestacao'\n"
+            "📋 Colunas opcionais: 'data_pagamento', 'cod_acordo'\n\n"
+            "🎯 Nova lógica inteligente:\n"
+            "• Prioriza registros sem data_pagamento\n"
+            "• Escolhe cod_acordo=0 quando aplicável\n"
+            "• Seleciona menor cod_prestacao como desempate"
+        )
+        
+        if opcao is None:  # Cancelar
+            self.voltar_menu()
+            return
+        elif opcao:  # Usar arquivo de exemplo
+            arquivo_entrada = "data/Modelos/arquivo_teste_duplicatas.xlsx"
+            if not os.path.exists(arquivo_entrada):
+                messagebox.showerror("Erro", f"Arquivo de exemplo não encontrado:\n{arquivo_entrada}")
+                self.voltar_menu()
+                return
+            
+            # Sugerir arquivo de saída
+            arquivo_saida = filedialog.asksaveasfilename(
+                title="Salvar registros corretos resolvidos como",
+                defaultextension=".xlsx",
+                initialfile="registros_corretos_resolvidos.xlsx",
+                filetypes=[("Arquivos Excel", "*.xlsx")]
+            )
+            if not arquivo_saida:
+                self.voltar_menu()
+                return
+        else:  # Selecionar arquivo próprio
+            arquivo_entrada = filedialog.askopenfilename(
+                title="Selecionar arquivo Excel para resolver duplicatas",
+                filetypes=[("Arquivos Excel", "*.xlsx"), ("Todos os arquivos", "*.*")]
+            )
+            if not arquivo_entrada:
+                self.voltar_menu()
+                return
+            
+            # Sugerir nome do arquivo de saída
+            base_name = os.path.splitext(os.path.basename(arquivo_entrada))[0]
+            pasta_origem = os.path.dirname(arquivo_entrada)
+            default_saida = os.path.join(pasta_origem, f"{base_name}_resolvidos.xlsx")
+            
+            arquivo_saida = filedialog.asksaveasfilename(
+                title="Salvar registros corretos resolvidos como",
+                defaultextension=".xlsx",
+                initialfile=f"{base_name}_resolvidos.xlsx",
+                initialdir=pasta_origem,
+                filetypes=[("Arquivos Excel", "*.xlsx")]
+            )
+            if not arquivo_saida:
+                self.voltar_menu()
+                return
+        
+        # Executar filtro de duplicatas
+        self.executar_filtrar_duplicatas(arquivo_entrada, arquivo_saida)
+    
+    def executar_filtrar_duplicatas(self, arquivo_entrada, arquivo_saida):
+        """Executa a resolução de duplicatas"""
+        # Log da operação
+        self.logger.log_user_action(f"Resolver Duplicatas: Iniciado", 
+                                   entrada=arquivo_entrada, 
+                                   saida=arquivo_saida)
+        
+        # Executar em thread separada
+        thread = threading.Thread(target=self.executar_filtrar_duplicatas_thread, 
+                                 args=(arquivo_entrada, arquivo_saida))
+        thread.daemon = True
+        thread.start()
+    
+    def executar_filtrar_duplicatas_thread(self, arquivo_entrada, arquivo_saida):
+        """Thread para executar resolução de duplicatas"""
+        try:
+            from src.filtrar_duplicatas import filtrar_duplicatas_cpf_data, salvar_arquivo_com_formatacao
+            
+            self.atualizar_progresso(10, "📂 Carregando arquivo...")
+            
+            # Carregar arquivo
+            df = pd.read_excel(arquivo_entrada)
+            total_inicial = len(df)
+            
+            self.logger.info(f"Resolver Duplicatas: Arquivo carregado - {total_inicial} registros")
+            self.atualizar_progresso(30, f"🔍 Analisando {total_inicial} registros...")
+            
+            # Verificar se arquivo tem dados
+            if total_inicial == 0:
+                raise ValueError("❌ Arquivo está vazio")
+            
+            # Verificar colunas necessárias
+            colunas_necessarias = ['cpf', 'data_vencimento', 'numero_prestacao', 'cod_prestacao']
+            colunas_faltantes = [col for col in colunas_necessarias if col not in df.columns]
+            
+            if colunas_faltantes:
+                raise ValueError(f"❌ Colunas não encontradas: {', '.join(colunas_faltantes)}")
+            
+            # Resolver duplicatas aplicando regras inteligentes
+            self.atualizar_progresso(50, "🎯 Aplicando regras inteligentes...")
+            df_resolvidos = filtrar_duplicatas_cpf_data(df)
+            
+            registros_resolvidos = len(df_resolvidos)
+            
+            if registros_resolvidos == 0:
+                raise ValueError("❌ Nenhum duplicado encontrado no arquivo")
+            
+            self.atualizar_progresso(80, "💾 Salvando registros corretos...")
+            
+            # Salvar arquivo com formatação (registros corretos escolhidos)
+            salvar_arquivo_com_formatacao(df_resolvidos, arquivo_saida)
+            
+            # Gerar relatório de resolução
+            relatorio_file = arquivo_saida.replace('.xlsx', '_relatorio_duplicatas.txt')
+            grupos_resolvidos = len(df_resolvidos.groupby(['cpf', 'data_vencimento', 'numero_prestacao']))
+            
+            with open(relatorio_file, "w", encoding="utf-8") as f:
+                f.write(f"=== RELATÓRIO DE RESOLUÇÃO DE DUPLICATAS ===\n")
+                f.write(f"Data/Hora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"Arquivo original: {os.path.basename(arquivo_entrada)}\n")
+                f.write(f"Arquivo de resultado: {os.path.basename(arquivo_saida)}\n")
+                f.write(f"Total de registros originais: {total_inicial}\n")
+                f.write(f"Grupos de duplicatas resolvidos: {grupos_resolvidos}\n")
+                f.write(f"Registros corretos escolhidos: {registros_resolvidos}\n")
+                f.write(f"Taxa de duplicação: {(grupos_resolvidos/total_inicial*100) if total_inicial > 0 else 0:.1f}%\n")
+                f.write("=" * 60 + "\n\n")
+                f.write("REGRAS APLICADAS:\n")
+                f.write("1. Se tiver data_pagamento: salva linha sem data_pagamento\n")
+                f.write("2. Se ambos têm data_pagamento: prioriza cod_acordo=0\n")
+                f.write("3. Se ambos têm data_pagamento e cod_acordo: menor cod_prestacao\n")
+                f.write("4. Se data_pagamento null: prioriza cod_acordo=0\n")
+                f.write("5. Se data_pagamento null e ambos têm cod_acordo: menor cod_prestacao\n")
+            
+            self.atualizar_progresso(100, "✅ Resolução concluída!")
+            
+            # Log sucesso
+            self.logger.log_user_action(f"Resolver Duplicatas: Concluído com sucesso", 
+                                       registros_originais=total_inicial,
+                                       grupos_resolvidos=grupos_resolvidos,
+                                       registros_corretos_salvos=registros_resolvidos)
+            
+            # Mostrar resultado
+            resultado_msg = f"""✅ Resolução de duplicatas concluída!
+
+📊 Registros originais: {total_inicial:,}
+🎯 Grupos de duplicatas: {grupos_resolvidos:,}
+✅ Registros corretos escolhidos: {registros_resolvidos:,}
+📁 Arquivo salvo: {os.path.basename(arquivo_saida)}
+📝 Relatório salvo: {os.path.basename(relatorio_file)}
+
+🎯 Regras aplicadas:
+• Prioriza registros sem data_pagamento
+• Escolhe cod_acordo=0 quando aplicável  
+• Usa menor cod_prestacao como desempate"""
+            
+            messagebox.showinfo("Resolução Concluída", resultado_msg)
+            
+        except Exception as e:
+            self.logger.error(f"Erro na resolução de duplicatas: {e}")
+            self.atualizar_progresso(0, f"❌ Erro: {str(e)}")
+            messagebox.showerror("Erro", f"Erro na resolução de duplicatas:\n{str(e)}")
+        
+        finally:
+            # Voltar ao menu
             self.voltar_menu()
 
 def main():
