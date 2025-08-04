@@ -45,7 +45,7 @@ def limpar_cpf(cpf_raw):
     cpf_limpo = re.sub(r'\D', '', cpf_raw)
     return cpf_limpo.zfill(11) if cpf_limpo else ""
 
-def consultar_easycollector(cpf, login, senha):
+def consultar_easycollector(cpf, login, senha, data_pagamento_alvo=None):
     global debug_counter
     
     payload = {
@@ -62,147 +62,166 @@ def consultar_easycollector(cpf, login, senha):
         if debug_counter < MAX_DEBUG_LOGS:
             print(f"\n[DEBUG #{debug_counter+1}] ===== ANÁLISE DETALHADA CPF: {cpf} =====")
             print(f"[DEBUG #{debug_counter+1}] Response Status: {response.status_code}")
+            print(f"[DEBUG #{debug_counter+1}] Data pagamento alvo: {data_pagamento_alvo}")
             print(f"[DEBUG #{debug_counter+1}] Response Content (primeiros 1000 chars):\n{response.text[:1000]}...")
             debug_counter += 1
         
-        # Parsing melhorado usando delimitadores específicos
+        # Parsing usando a estrutura XML REAL da API
         response_text = response.text
         
-        # Método 1: Usar delimitadores específicos baseados na sua observação
-        blocos_personalizados = []
-        if "<NmCedente>" in response_text and "</PercentualDescontoJuros>" in response_text:
-            # Dividir por início de bloco
-            partes = response_text.split("<NmCedente>")
-            for i, parte in enumerate(partes[1:], 1):  # Pular primeira parte vazia
-                # Encontrar fim do bloco
-                if "</PercentualDescontoJuros>" in parte:
-                    fim_bloco = parte.find("</PercentualDescontoJuros>") + len("</PercentualDescontoJuros>")
-                    bloco_completo = "<NmCedente>" + parte[:fim_bloco]
-                    blocos_personalizados.append(bloco_completo)
-                    
-                    if debug_counter <= MAX_DEBUG_LOGS:
-                        print(f"[DEBUG] CPF {cpf}: Bloco personalizado {i} extraído (tamanho: {len(bloco_completo)} chars)")
-        
-        # Parsing com BeautifulSoup nos blocos personalizados
-        soup = BeautifulSoup(response.content, "xml")
-        
-        # Procurar por todos os blocos DividaAtiva (método original)
-        divida_ativa_blocks = soup.find_all("DividaAtiva")
+        # Decodificar entities HTML
+        decoded_xml = response_text.replace("&lt;", "<").replace("&gt;", ">")
         
         if debug_counter <= MAX_DEBUG_LOGS:
-            print(f"[DEBUG] CPF {cpf}: BeautifulSoup encontrou {len(divida_ativa_blocks)} blocos DividaAtiva")
-            print(f"[DEBUG] CPF {cpf}: Método personalizado encontrou {len(blocos_personalizados)} blocos")
+            print(f"[DEBUG] CPF {cpf}: XML decodificado (primeiros 1500 chars):\n{decoded_xml[:1500]}...")
         
-        # Coletar dados usando ambos os métodos
-        id_cliente_vals = []
-        id_acordo_vals = []
+        # Parse do XML decodificado
+        soup_decoded = BeautifulSoup(decoded_xml, "xml")
+        
+        # Buscar blocos DividaAtiva dentro da estrutura real
+        divida_ativa_blocks = soup_decoded.find_all("DividaAtiva")
+        
+        if debug_counter <= MAX_DEBUG_LOGS:
+            print(f"[DEBUG] CPF {cpf}: {len(divida_ativa_blocks)} blocos DividaAtiva encontrados no XML decodificado")
+        
+        # Buscar também IdCliente na raiz (pode estar em ClienteDivida)
+        cliente_divida_blocks = soup_decoded.find_all("ClienteDivida")
+        id_cliente_raiz = 0
+        
+        if cliente_divida_blocks:
+            for cliente_block in cliente_divida_blocks:
+                id_cliente_elem = cliente_block.find("IdCliente")
+                if id_cliente_elem and id_cliente_elem.text and id_cliente_elem.text.strip().isdigit():
+                    id_cliente_raiz = int(id_cliente_elem.text.strip())
+                    if debug_counter <= MAX_DEBUG_LOGS:
+                        print(f"[DEBUG] CPF {cpf}: IdCliente encontrado na raiz ClienteDivida: {id_cliente_raiz}")
+                    break
+        
+        
+        # Coletar dados com correspondência por data de vencimento
+        id_cliente_final = id_cliente_raiz  # Começar com IdCliente da raiz
+        id_acordo_final = 0
         data_vencs = []
         
-        # Método 1: Processar blocos personalizados (baseado na sua observação)
-        for i, bloco_texto in enumerate(blocos_personalizados):
-            if debug_counter <= MAX_DEBUG_LOGS:
-                print(f"[DEBUG] CPF {cpf}: Processando bloco personalizado {i+1}")
-            
-            # Usar BeautifulSoup no bloco individual
-            bloco_soup = BeautifulSoup(bloco_texto, "xml")
-            
-            # Extrair IdCliente
-            id_cliente_elem = bloco_soup.find("IdCliente")
-            if id_cliente_elem and id_cliente_elem.text and id_cliente_elem.text.strip().isdigit():
-                val = int(id_cliente_elem.text.strip())
-                if val != 0:
-                    id_cliente_vals.append(val)
-                    if debug_counter <= MAX_DEBUG_LOGS:
-                        print(f"[DEBUG] CPF {cpf} Bloco personalizado {i+1}: IdCliente={val}")
-            
-            # Extrair IdAcordo
-            id_acordo_elem = bloco_soup.find("IdAcordo")
-            if id_acordo_elem and id_acordo_elem.text and id_acordo_elem.text.strip().isdigit():
-                val = int(id_acordo_elem.text.strip())
-                if val != 0:
-                    id_acordo_vals.append(val)
-                    if debug_counter <= MAX_DEBUG_LOGS:
-                        print(f"[DEBUG] CPF {cpf} Bloco personalizado {i+1}: IdAcordo={val}")
-            
-            # Extrair DataVencimento
-            data_venc_elem = bloco_soup.find("DataVencimento")
-            if data_venc_elem and data_venc_elem.text and data_venc_elem.text.strip():
-                data_vencs.append(data_venc_elem.text.strip())
-        
-        # Método 2: Processar blocos DividaAtiva tradicionais (fallback)
-        if not blocos_personalizados and divida_ativa_blocks:
-            if debug_counter <= MAX_DEBUG_LOGS:
-                print(f"[DEBUG] CPF {cpf}: Usando método tradicional DividaAtiva como fallback")
+        # Processar blocos DividaAtiva com correspondência por data
+        for i, bloco in enumerate(divida_ativa_blocks):
+            # Extrair DataPagamento do bloco (não DataVencimento)
+            data_pag_elem = bloco.find("DataPagamento")
+            if data_pag_elem and data_pag_elem.text:
+                data_pag_bloco = data_pag_elem.text.strip()
+                data_vencs.append(data_pag_bloco)
                 
-            for i, bloco in enumerate(divida_ativa_blocks):
-                # Extrair IdCliente do bloco atual
-                id_cliente_elem = bloco.find("IdCliente")
-                if id_cliente_elem and id_cliente_elem.text and id_cliente_elem.text.strip().isdigit():
-                    val = int(id_cliente_elem.text.strip())
-                    if val != 0:
-                        id_cliente_vals.append(val)
+                # Extrair apenas a data (formato: 2025-08-31)
+                data_bloco_limpa = data_pag_bloco[:10] if len(data_pag_bloco) >= 10 else data_pag_bloco
+                
+                if debug_counter <= MAX_DEBUG_LOGS:
+                    print(f"[DEBUG] CPF {cpf} Bloco DividaAtiva {i+1}: DataPagamento={data_bloco_limpa}")
+                
+                # Verificar correspondência por data
+                bloco_correspondente = False
+                if data_pagamento_alvo:
+                    # Normalizar data alvo (remover tempo se houver)
+                    data_alvo_limpa = str(data_pagamento_alvo)[:10] if len(str(data_pagamento_alvo)) >= 10 else str(data_pagamento_alvo)
+                    
+                    if data_bloco_limpa == data_alvo_limpa:
+                        bloco_correspondente = True
                         if debug_counter <= MAX_DEBUG_LOGS:
-                            print(f"[DEBUG] CPF {cpf} Bloco DividaAtiva {i+1}: IdCliente={val}")
-                
-                # Extrair IdAcordo do bloco atual
-                id_acordo_elem = bloco.find("IdAcordo")
-                if id_acordo_elem and id_acordo_elem.text and id_acordo_elem.text.strip().isdigit():
-                    val = int(id_acordo_elem.text.strip())
-                    if val != 0:
-                        id_acordo_vals.append(val)
+                            print(f"[DEBUG] CPF {cpf} Bloco {i+1}: ✅ CORRESPONDÊNCIA ENCONTRADA! {data_bloco_limpa} == {data_alvo_limpa}")
+                    else:
                         if debug_counter <= MAX_DEBUG_LOGS:
-                            print(f"[DEBUG] CPF {cpf} Bloco DividaAtiva {i+1}: IdAcordo={val}")
+                            print(f"[DEBUG] CPF {cpf} Bloco {i+1}: ❌ Sem correspondência {data_bloco_limpa} != {data_alvo_limpa}")
+                else:
+                    # Se não há data alvo, processar o primeiro bloco válido
+                    bloco_correspondente = True
+                    if debug_counter <= MAX_DEBUG_LOGS:
+                        print(f"[DEBUG] CPF {cpf} Bloco {i+1}: 📅 Sem data alvo, processando bloco")
                 
-                # Extrair DataVencimento do bloco atual
-                data_venc_elem = bloco.find("DataVencimento")
-                if data_venc_elem and data_venc_elem.text and data_venc_elem.text.strip():
-                    data_vencs.append(data_venc_elem.text.strip())
+                # Se é o bloco correspondente, extrair IdAcordo
+                if bloco_correspondente:
+                    # Procurar IdAcordo no bloco atual
+                    id_acordo_elem = bloco.find("IdAcordo")
+                    if id_acordo_elem and id_acordo_elem.text and id_acordo_elem.text.strip().isdigit():
+                        val = int(id_acordo_elem.text.strip())
+                        if val != 0:
+                            id_acordo_final = val
+                            if debug_counter <= MAX_DEBUG_LOGS:
+                                print(f"[DEBUG] CPF {cpf} Bloco correspondente {i+1}: ✅ IdAcordo={val}")
+                    
+                    # Se não encontrou IdAcordo no bloco, procurar em campos alternativos
+                    if id_acordo_final == 0:
+                        # Verificar se existe algum identificador que possa ser o acordo
+                        identificador_elem = bloco.find("Identificador")
+                        if identificador_elem and identificador_elem.text and identificador_elem.text.strip().isdigit():
+                            val = int(identificador_elem.text.strip())
+                            if val != 0:
+                                id_acordo_final = val
+                                if debug_counter <= MAX_DEBUG_LOGS:
+                                    print(f"[DEBUG] CPF {cpf} Bloco correspondente {i+1}: ✅ IdAcordo (via Identificador)={val}")
+                    
+                    # Se encontrou correspondência por data e tem dados, parar aqui
+                    if data_pagamento_alvo and (id_cliente_final != 0 or id_acordo_final != 0):
+                        if debug_counter <= MAX_DEBUG_LOGS:
+                            print(f"[DEBUG] CPF {cpf}: 🎯 Dados encontrados no bloco correspondente, finalizando busca")
+                        break
         
-        # Método 3: Busca global como último recurso
-        if not id_cliente_vals and not id_acordo_vals:
+        # Se não encontrou dados com correspondência por data, usar busca global
+        if id_cliente_final == 0 and id_acordo_final == 0:
             if debug_counter <= MAX_DEBUG_LOGS:
-                print(f"[DEBUG] CPF {cpf}: Usando busca global como último recurso")
+                print(f"[DEBUG] CPF {cpf}: Fazendo busca global no XML decodificado")
             
-            # Buscar todos os elementos diretamente
-            id_cliente_elements = soup.find_all("IdCliente")
-            id_acordo_elements = soup.find_all("IdAcordo")
+            # Buscar IdCliente global
+            if id_cliente_final == 0:
+                id_cliente_elements = soup_decoded.find_all("IdCliente")
+                for elem in id_cliente_elements:
+                    if elem.text and elem.text.strip().isdigit():
+                        val = int(elem.text.strip())
+                        if val != 0:
+                            id_cliente_final = val
+                            if debug_counter <= MAX_DEBUG_LOGS:
+                                print(f"[DEBUG] CPF {cpf} Global: ✅ IdCliente={val}")
+                            break
             
-            for elem in id_cliente_elements:
-                if elem.text and elem.text.strip().isdigit():
-                    val = int(elem.text.strip())
-                    if val != 0:
-                        id_cliente_vals.append(val)
-            
+            # Buscar IdAcordo global
+            id_acordo_elements = soup_decoded.find_all("IdAcordo")
             for elem in id_acordo_elements:
                 if elem.text and elem.text.strip().isdigit():
                     val = int(elem.text.strip())
                     if val != 0:
-                        id_acordo_vals.append(val)
-        
-        # Remover duplicatas mantendo ordem
-        id_cliente_vals = list(dict.fromkeys(id_cliente_vals))
-        id_acordo_vals = list(dict.fromkeys(id_acordo_vals))
-        
-        # Lógica de seleção: prioriza o primeiro valor válido encontrado
-        id_cliente = id_cliente_vals[0] if id_cliente_vals else 0
-        id_acordo = id_acordo_vals[0] if id_acordo_vals else 0
+                        id_acordo_final = val
+                        if debug_counter <= MAX_DEBUG_LOGS:
+                            print(f"[DEBUG] CPF {cpf} Global: ✅ IdAcordo={val}")
+                        break
+            
+            # Se ainda não encontrou IdAcordo, tentar buscar via Identificador
+            if id_acordo_final == 0:
+                identificador_elements = soup_decoded.find_all("Identificador")
+                for elem in identificador_elements:
+                    if elem.text and elem.text.strip().isdigit():
+                        val = int(elem.text.strip())
+                        if val != 0:
+                            id_acordo_final = val
+                            if debug_counter <= MAX_DEBUG_LOGS:
+                                print(f"[DEBUG] CPF {cpf} Global: ✅ IdAcordo (via Identificador)={val}")
+                            break
         
         # Debug detalhado para primeiros CPFs
         if debug_counter <= MAX_DEBUG_LOGS:
-            print(f"[RESULTADO] CPF {cpf}: IdCliente={id_cliente} (de {id_cliente_vals})")
-            print(f"[RESULTADO] CPF {cpf}: IdAcordo={id_acordo} (de {id_acordo_vals})")
+            print(f"[RESULTADO] CPF {cpf}: IdCliente={id_cliente_final}")
+            print(f"[RESULTADO] CPF {cpf}: IdAcordo={id_acordo_final}")
             print(f"[RESULTADO] CPF {cpf}: {len(data_vencs)} datas encontradas")
             if len(data_vencs) > 0:
                 print(f"[RESULTADO] CPF {cpf}: Primeira data: {data_vencs[0]}")
+                if data_pagamento_alvo:
+                    print(f"[RESULTADO] CPF {cpf}: Data alvo: {data_pagamento_alvo}")
         
-        return id_cliente, id_acordo, data_vencs
+        return id_cliente_final, id_acordo_final, data_vencs
 
     except Exception as e:
         print(f"❌ [ERRO] CPF {cpf}: {e}")
         return 0, 0, []
 
 def processar_linha_cpf(row_data):
-    """Processa uma única linha de CPF com logging melhorado"""
+    """Processa uma única linha de CPF com logging melhorado e correspondência por data"""
     i, row = row_data
     
     cod_acordo = row.get("cod_acordo", "0")
@@ -211,12 +230,29 @@ def processar_linha_cpf(row_data):
     # Debug: Log linha sendo processada
     cpf_raw = row.get("cpf", "")
     cpf = limpar_cpf(cpf_raw)
+    
+    # Buscar data_pagamento com múltiplas tentativas (compatibilidade)
+    data_pagamento = (
+        row.get("data_pagamento", "") or 
+        row.get("Data_Pagamento", "") or 
+        row.get("data_vencimento", "") or 
+        row.get("Data_Vencimento", "") or
+        ""
+    )
+    
     print(f"[Linha {i+1}] ===== PROCESSANDO CPF: {cpf} =====")
+    print(f"[Linha {i+1}] CPF original: {cpf_raw} → CPF limpo: {cpf}")
     print(f"[Linha {i+1}] Valores atuais - cod_cliente: {cod_cliente} | cod_acordo: {cod_acordo}")
+    print(f"[Linha {i+1}] Data pagamento encontrada: '{data_pagamento}'")
+    
+    # Debug das colunas disponíveis
+    if debug_counter < MAX_DEBUG_LOGS:
+        print(f"[DEBUG {i+1}] Colunas disponíveis: {list(row.keys())}")
+        print(f"[DEBUG {i+1}] Valores da linha: {dict(row)}")
 
-    if cod_acordo != "0" or cod_cliente != "0":
-        # Já possui os códigos → marcar como Excluir
-        print(f"[Linha {i+1}] ✅ CPF {cpf}: Já possui códigos, marcando para exclusão")
+    if cod_acordo != "0" and cod_cliente != "0":
+        # Já possui AMBOS os códigos → marcar como Excluir
+        print(f"[Linha {i+1}] ✅ CPF {cpf}: Já possui ambos os códigos, marcando para exclusão")
         return i, "Excluir", "Em Duplicidade", cod_cliente, cod_acordo
 
     # Para registros com cod_acordo e cod_cliente igual a 0, tenta atualizar
@@ -224,10 +260,10 @@ def processar_linha_cpf(row_data):
         print(f"[Linha {i+1}] ❌ CPF inválido: {cpf_raw}")
         return i, "", "", "0", "0"
 
-    print(f"[Linha {i+1}] 🔍 Consultando API para CPF: {cpf}")
+    print(f"[Linha {i+1}] 🔍 Consultando API para CPF: {cpf} com data: {data_pagamento}")
     
-    # Fazer consulta na API
-    id_cliente, id_acordo, datas = consultar_easycollector(cpf, LOGIN_FIXO, SENHA_FIXO)
+    # Fazer consulta na API com correspondência por data de pagamento
+    id_cliente, id_acordo, datas = consultar_easycollector(cpf, LOGIN_FIXO, SENHA_FIXO, data_pagamento)
 
     print(f"[Linha {i+1}] 📡 API retornou - IdCliente: {id_cliente} | IdAcordo: {id_acordo} | Datas: {len(datas)}")
 
@@ -249,7 +285,18 @@ def processar_linha_cpf(row_data):
     # Determinar status baseado nos resultados
     if alterou and (new_cod_cliente != "0" or new_cod_acordo != "0"):
         status = "Update"
-        observacao = f"Atualizado - Cliente:{new_cod_cliente}, Acordo:{new_cod_acordo}"
+        # Observação mais clara
+        campos_atualizados = []
+        if new_cod_cliente != cod_cliente:
+            campos_atualizados.append(f"cod_cliente: {new_cod_cliente}")
+        if new_cod_acordo != cod_acordo:
+            campos_atualizados.append(f"cod_acordo: {new_cod_acordo}")
+        
+        if campos_atualizados:
+            observacao = f"Atualizado - {', '.join(campos_atualizados)}"
+        else:
+            observacao = "Dados confirmados"
+        
         print(f"[Linha {i+1}] 🎯 STATUS: Update (dados encontrados e atualizados)")
     elif id_cliente == 0 and id_acordo == 0:
         # Só marca como "Não Encontrado" se a API não retornou NENHUM dado

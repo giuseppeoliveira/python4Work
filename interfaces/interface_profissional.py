@@ -1025,10 +1025,10 @@ class Python4WorkPro:
                 return
             
             # Preencher valores vazios e adicionar colunas necessárias
-            df.fillna("0", inplace=True)
+            df.fillna("", inplace=True)  # Usar string vazia em vez de "0"
             for col in ['cod_cliente', 'cod_acordo', 'status', 'observacao']:
                 if col not in df.columns:
-                    df[col] = "0"
+                    df[col] = ""  # Usar string vazia em vez de "0"
             
             total = len(df)
             batch_size = 25
