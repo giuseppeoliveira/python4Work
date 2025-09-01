@@ -69,11 +69,23 @@ def criar_sessao_otimizada():
 session = criar_sessao_otimizada()
 
 def validar_codigo(valor, nome_campo, index):
-    """Valida e converte códigos para inteiro, com tratamento robusto de tipos"""
+    """Valida e converte códigos para inteiro, com tratamento robusto de tipos incluindo numpy"""
     try:
         if valor is None or valor == "":
             print(f"⚠️ Linha {index + 1}: {nome_campo} está vazio ou None")
             return None
+        
+        # Importar numpy dinamicamente para verificar tipos
+        try:
+            import numpy as np
+            # Verificar se é tipo numpy e converter para tipo Python nativo
+            if hasattr(valor, 'dtype'):  # É um tipo numpy
+                if np.isnan(valor):
+                    print(f"⚠️ Linha {index + 1}: {nome_campo} é NaN")
+                    return None
+                valor = valor.item()  # Converter numpy para tipo Python nativo
+        except ImportError:
+            pass  # numpy não disponível, continuar normalmente
             
         # Tentar converter diferentes tipos para int
         if isinstance(valor, str):
@@ -106,8 +118,12 @@ def validar_codigo(valor, nome_campo, index):
                 return int(valor)
             return int(valor)
         else:
-            print(f"⚠️ Linha {index + 1}: {nome_campo} tem tipo não suportado: {type(valor)} = {valor}")
-            return None
+            # Tentar conversão direta para int como último recurso
+            try:
+                return int(valor)
+            except (ValueError, TypeError):
+                print(f"⚠️ Linha {index + 1}: {nome_campo} tem tipo não suportado: {type(valor)} = {valor}")
+                return None
             
     except Exception as e:
         print(f"❌ Linha {index + 1}: Erro ao validar {nome_campo} = {valor}: {e}")
