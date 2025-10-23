@@ -249,6 +249,22 @@ class Python4WorkPro:
                 'cor': 'primary',
                 'comando': self.abrir_filtrar_duplicatas,
                 'row': 2, 'col': 0
+            },
+            {
+                'titulo': '🛡️ NoLog - Manter Sessão',
+                'descricao': 'Mantém sua sessão ativa impedindo bloqueio de tela e timeout',
+                'icone': '🛡️',
+                'cor': 'success',
+                'comando': self.abrir_nolog,
+                'row': 2, 'col': 1
+            },
+            {
+                'titulo': '🔧 Separador de Dívidas',
+                'descricao': 'Extrai e separa dívidas de XML do Easy Collector em JSON legível',
+                'icone': '🔧',
+                'cor': 'accent',
+                'comando': self.abrir_separador_dividas,
+                'row': 3, 'col': 0
             }
         ]
         
@@ -1504,6 +1520,46 @@ class Python4WorkPro:
         finally:
             # Voltar ao menu
             self.voltar_menu()
+    
+    def abrir_nolog(self):
+        """Abre a interface do NoLog em uma nova janela"""
+        self.logger.log_user_action("Abriu NoLog", session_id=self.session_id)
+        
+        try:
+            # Criar nova janela
+            nolog_window = tk.Toplevel(self.root)
+            
+            # Importar e iniciar NoLog GUI
+            from src.nolog import NoLogGUI
+            
+            # Criar instância do NoLog na nova janela
+            nolog_app = NoLogGUI(nolog_window)
+            
+            self.logger.info("NoLog iniciado com sucesso")
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao abrir NoLog: {e}")
+            messagebox.showerror("Erro", f"Erro ao abrir NoLog:\n{str(e)}")
+    
+    def abrir_separador_dividas(self):
+        """Abre a interface do Separador de Dívidas em uma nova janela"""
+        self.logger.log_user_action("Abriu Separador de Dívidas", session_id=self.session_id)
+        
+        try:
+            # Criar nova janela
+            separador_window = tk.Toplevel(self.root)
+            
+            # Importar e iniciar Separador GUI
+            from src.separador_dividas import SeparadorDividasGUI
+            
+            # Criar instância do Separador na nova janela
+            separador_app = SeparadorDividasGUI(separador_window)
+            
+            self.logger.info("Separador de Dívidas iniciado com sucesso")
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao abrir Separador de Dívidas: {e}")
+            messagebox.showerror("Erro", f"Erro ao abrir Separador de Dívidas:\n{str(e)}")
 
 def main():
     """Função principal"""

@@ -9,6 +9,9 @@ Sistema profissional integrado para automação de processos financeiros com int
 - **Consultar Acordo**: Verifica status de acordos usando códigos previamente obtidos
 - **Extrair JSON**: Processa requisições e extrai dados estruturados
 - **Converter CSV/XLSX**: Conversão bidirecional entre formatos
+- **Resolver Duplicatas**: Sistema inteligente para resolver registros duplicados baseado em regras
+- **🛡️ NoLog**: Mantém sua sessão ativa impedindo bloqueio de tela e timeout automático
+- **🔧 Separador de Dívidas**: Extrai e separa dívidas de XML do Easy Collector em formato JSON legível
 
 ### ✨ Características Avançadas
 - **Correspondência por Data**: Sistema inteligente que correlaciona `data_pagamento` do Excel com `DataPagamento` da API
@@ -77,6 +80,55 @@ cpf | data_pagamento | cod_cliente | cod_acordo | status | observacao
 14416204 | 2025-08-04 | 6778571 | 59213193 | Update | Atualizado - cod_acordo: 59213193
 ```
 
+### 🛡️ NoLog - Manter Sessão Ativa
+
+Ferramenta que mantém sua sessão ativa impedindo bloqueio de tela e timeout automático.
+
+**Recursos:**
+- ✅ Movimento sutil do mouse a cada intervalo configurável
+- ✅ Pressiona tecla Shift (não gera caracteres)
+- ✅ Previne suspensão do sistema e da tela
+- ✅ Interface visual com contador de ações
+- ✅ Sons de notificação (pode ser desabilitado)
+- ✅ Botão único LIGA/DESLIGA
+- ✅ Failsafe: mova mouse para canto da tela para parar
+
+**Configuração padrão:**
+- Intervalo: 60 segundos
+- Movimento de mouse: 1 pixel
+- Sons: Habilitados
+
+**Como usar:**
+1. Clique no card "🛡️ NoLog - Manter Sessão"
+2. Clique no botão "▶ INICIAR PROTEÇÃO"
+3. A proteção ficará ativa mantendo sua sessão
+4. Clique em "■ PARAR PROTEÇÃO" quando terminar
+
+### 🔧 Separador de Dívidas XML
+
+Extrai e separa cada bloco `<DividaAtiva>` de XMLs do Easy Collector em formato JSON legível.
+
+**Recursos:**
+- ✅ Cola XML direto na interface
+- ✅ Remove texto duplicado ou inválido automaticamente
+- ✅ Extrai todos os blocos `<DividaAtiva>` individualmente
+- ✅ Converte cada bloco para JSON formatado (indent=2)
+- ✅ Salva em arquivo TXT com separadores visuais
+- ✅ Mais de 70 campos extraídos por dívida
+
+**Como usar:**
+1. Clique no card "🔧 Separador de Dívidas"
+2. Cole o XML do Easy Collector na área de texto
+3. Clique em "▶ PROCESSAR XML"
+4. Escolha onde salvar o arquivo TXT
+5. Cada dívida estará separada em blocos JSON legíveis
+
+**Campos extraídos incluem:**
+- Identificação: IdDivida, NumeroInscricao, OrigemDebito
+- Valores: ValorConsolidado, ValorPrincipal, ValorMulta, ValorJuros
+- Datas: DataInscricao, DataVencimento, DataConstituicao
+- E mais de 60 outros campos relevantes
+
 ## 🔧 Arquitetura do Sistema
 
 ### Estrutura de Diretórios
@@ -95,7 +147,13 @@ python4Work/
 │   ├── obter_divida_cpf.py # Processamento de CPFs
 │   ├── consultar_acordo.py # Consulta de acordos
 │   ├── extrair_json_corpo_requisicao.py
-│   └── conversor_csv_xlsx.py
+│   ├── conversor_csv_xlsx.py
+│   ├── filtrar_duplicatas.py # Resolver duplicatas
+│   ├── nolog/              # Módulo NoLog (manter sessão ativa)
+│   │   ├── nolog_core.py
+│   │   └── nolog_gui.py
+│   └── separador_dividas/  # Módulo Separador de Dívidas XML
+│       └── separador_dividas_gui.py
 ├── interfaces/             # Interface gráfica
 │   └── interface_profissional.py
 ├── data/                   # Dados e modelos
