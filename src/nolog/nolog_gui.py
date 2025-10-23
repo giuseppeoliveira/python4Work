@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import messagebox
 import threading
 from datetime import datetime
+import os
 from .nolog_core import NoLogCore
 
 
@@ -15,8 +16,9 @@ class NoLogGUI:
         self.root = root
         self.root.title("NoLog - Mantenha sua Sessão Ativa")
         
-        # Inicializa o core
-        self.nolog = NoLogCore()
+        # Inicializa o core com caminho correto do config
+        config_path = os.path.join(os.path.dirname(__file__), "config.json")
+        self.nolog = NoLogCore(config_path)
         self.thread = None
         
         # Cores
