@@ -63,14 +63,15 @@ class NoLogCore:
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except FileNotFoundError:
-            # Configurações padrão
+        except (FileNotFoundError, json.JSONDecodeError):
+            # Configurações padrão (sempre usar se não encontrar arquivo)
             return {
                 "interval_seconds": 60,
                 "mouse_movement": True,
                 "key_press": True,
                 "prevent_sleep": True,
-                "movement_distance": 1
+                "movement_distance": 1,
+                "sound_enabled": True
             }
     
     def prevent_sleep_mode(self, enable: bool = True):
