@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import messagebox
 import threading
 from datetime import datetime
-from nolog_core import NoLogCore
+from .nolog_core import NoLogCore
 
 
 class NoLogGUI:
