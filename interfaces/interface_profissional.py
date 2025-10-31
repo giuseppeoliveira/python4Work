@@ -829,6 +829,69 @@ class Python4WorkPro:
                                 args=(arquivo_entrada, arquivo_saida))
         thread.daemon = True
         thread.start()
+
+    def abrir_consulta_boleto_mensal(self):
+        """Abre interface para Consulta Boleto Mensal"""
+        self.logger.log_user_action("Abriu Consulta Boleto Mensal", session_id=self.session_id)
+
+        # Seleção de arquivo de entrada
+        arquivo_entrada = filedialog.askopenfilename(
+            title="Selecione o arquivo Excel com colunas: cod_aluno, cpf",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+
+        if not arquivo_entrada:
+            return
+
+        # Perguntar ano e mês
+        from tkinter import simpledialog
+        ano = simpledialog.askinteger("Ano", "Informe o ano (AAAA):", parent=self.root, minvalue=2000, maxvalue=2100)
+        if ano is None:
+            return
+        mes = simpledialog.askinteger("Mês", "Informe o mês (1-12):", parent=self.root, minvalue=1, maxvalue=12)
+        if mes is None:
+            return
+
+        # Seleção de arquivo de saída
+        arquivo_saida = filedialog.asksaveasfilename(
+            title="Salvar resultado como",
+            defaultextension=".xlsx",
+            initialfile=f"consulta_boleto_{ano}{str(mes).zfill(2)}_{time.strftime('%Y%m%d_%H%M%S')}.xlsx",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+
+        if not arquivo_saida:
+            return
+
+        # Inicializar barra de progresso e executar
+        self.mostrar_progresso("Consulta Boleto Mensal")
+        self.btn_parar.config(state="normal")
+        self.btn_cancelar.config(state="normal")
+
+        thread = threading.Thread(target=self.executar_consulta_boleto_mensal,
+                                  args=(arquivo_entrada, arquivo_saida, ano, mes))
+        thread.daemon = True
+        thread.start()
+
+    def executar_consulta_boleto_mensal(self, arquivo_entrada, arquivo_saida, ano, mes):
+        """Executa a consulta boleto mensal em background"""
+        try:
+            from src.consulta_boleto_mensal import run_consulta_boleto
+
+            self.atualizar_progresso(5, "Iniciando consultas...")
+
+            # run_consulta_boleto irá lançar exceção caso credenciais não existam
+            df_result = run_consulta_boleto(arquivo_entrada, arquivo_saida, ano, mes)
+
+            self.atualizar_progresso(100, "Consulta concluída")
+            messagebox.showinfo("Sucesso", f"Consulta concluída. Arquivo gerado:\n{arquivo_saida}")
+
+        except Exception as e:
+            self.logger.error(f"Erro em Consulta Boleto Mensal: {e}")
+            messagebox.showerror("Erro", f"Erro durante a consulta:\n{str(e)}")
+
+        finally:
+            self.voltar_menu()
     
     def executar_consultar_acordo(self, arquivo_entrada, arquivo_saida):
         """Executa consulta de acordo com validação robusta e processamento otimizado"""

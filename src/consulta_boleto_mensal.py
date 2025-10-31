@@ -8,6 +8,157 @@ from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
 
+# Carrega .env
+load_dotenv()
+
+URL_DIVIDA = os.getenv("URL_DIVIDA", "http://54.83.29.48/easycollectorws/easycollectorWs.asmx/ObterDividaAtivaPorCPF")
+
+# Sessão HTTP reutilizável
+session = requests.Session()
+session.headers.update({'Connection': 'keep-alive'})
+
+def limpar_cpf(cpf_raw):
+    if not isinstance(cpf_raw, str):
+        cpf_raw = str(cpf_raw)
+    cpf_limpo = re.sub(r'\D', '', cpf_raw)
+    return cpf_limpo.zfill(11) if cpf_limpo else ""
+
+def fetch_divida_blocks(cpf, login, senha, timeout=10):
+    """Faz POST na API e retorna lista de dicts representando cada <DividaAtiva> encontrado."""
+    payload = {
+        "logonUsuario": login,
+        "senhaUsuario": senha,
+        "cpfCnpj": cpf
+    }
+    response = session.post(URL_DIVIDA, data=payload, timeout=timeout)
+    response.raise_for_status()
+
+    # Decodifica entities
+    decoded_xml = response.text.replace("&lt;", "<").replace("&gt;", ">")
+    soup = BeautifulSoup(decoded_xml, "xml")
+
+    blocks = []
+    divida_tags = soup.find_all("DividaAtiva")
+    for bloco in divida_tags:
+        record = {}
+        # extrai filhos diretos
+        for child in bloco.find_all(recursive=False):
+            key = child.name
+            val = child.text.strip() if child.text else ""
+            # Normalizar col name
+            record[key] = val
+        blocks.append(record)
+
+    return blocks
+
+def process_row_get_blocks(cod_aluno, cpf_raw, login, senha, ano_mes_prefix):
+    cpf = limpar_cpf(cpf_raw)
+    if not cpf or cpf == "00000000000":
+        return [{
+            'cod_aluno': cod_aluno,
+            'cpf': cpf_raw,
+            'status': 'CPF inválido',
+        }]
+
+    try:
+        blocks = fetch_divida_blocks(cpf, login, senha)
+    except Exception as e:
+        return [{
+            'cod_aluno': cod_aluno,
+            'cpf': cpf,
+            'status': f'Erro ao consultar API: {str(e)}',
+        }]
+
+    matched = []
+    prefix = ano_mes_prefix
+    for b in blocks:
+        dv = b.get('DataVencimento') or b.get('Data_Vencimento') or b.get('dataVencimento') or ''
+        if dv.startswith(prefix):
+            # Merge cod_aluno and cpf into block
+            rec = {'cod_aluno': cod_aluno, 'cpf': cpf}
+            rec.update(b)
+            matched.append(rec)
+
+    if not matched:
+        return [{
+            'cod_aluno': cod_aluno,
+            'cpf': cpf,
+            'status': 'Nenhuma dívida encontrada para o período'
+        }]
+
+    return matched
+
+def run_consulta_boleto(caminho_entrada, caminho_saida, ano, mes, login=None, senha=None, max_workers=15):
+    """Executa a consulta boleto mensal.
+
+    Retorna (df_result, errors)
+    """
+    # Carregar credenciais se não passadas
+    if login is None or senha is None:
+        login = os.getenv('LOGIN')
+        senha = os.getenv('SENHA')
+
+    if not login or not senha:
+        raise ValueError('Credenciais não encontradas. Configure LOGIN e SENHA no .env ou passe como argumento')
+
+    df = pd.read_excel(caminho_entrada, engine='openpyxl', dtype=str)
+    # normalizar colunas
+    df.columns = df.columns.str.strip().str.lower()
+
+    # aceitar cod_aluno e cpf (diversas variações)
+    if 'cpf' not in df.columns:
+        raise ValueError("Arquivo de entrada deve conter a coluna 'cpf'")
+
+    cod_col = None
+    for c in ['cod_aluno', 'codaluno', 'cod_aluno ']:
+        if c in df.columns:
+            cod_col = c
+            break
+    if cod_col is None:
+        # criar coluna cod_aluno vazia se não existir
+        df['cod_aluno'] = ''
+        cod_col = 'cod_aluno'
+
+    ano_str = str(ano)
+    mes_str = str(mes).zfill(2)
+    prefix = f"{ano_str}-{mes_str}"
+
+    all_records = []
+
+    rows = list(df[[cod_col, 'cpf']].itertuples(index=False, name=None))
+
+    # process in parallel
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_row_get_blocks, cod, cpf, login, senha, prefix) for cod, cpf in rows]
+        for future in as_completed(futures):
+            try:
+                res = future.result()
+                # res is a list of records
+                all_records.extend(res)
+            except Exception as e:
+                # unexpected
+                all_records.append({'cod_aluno': '', 'cpf': '', 'status': f'Erro interno: {str(e)}'})
+
+    # criar dataframe final
+    result_df = pd.DataFrame(all_records)
+
+    # salvar
+    result_df.to_excel(caminho_saida, index=False, engine='openpyxl')
+
+    return result_df
+
+if __name__ == '__main__':
+    print('Módulo consulta_boleto_mensal: executar via import ou chamando run_consulta_boleto')
+import os
+import re
+import time
+import json
+import requests
+import pandas as pd
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dotenv import load_dotenv
+
 load_dotenv()
 
 URL_DIVIDA = os.getenv("URL_DIVIDA", "http://54.83.29.48/easycollectorws/easycollectorWs.asmx/ObterDividaAtivaPorCPF")
