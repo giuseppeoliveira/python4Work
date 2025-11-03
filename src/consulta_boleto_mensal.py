@@ -147,6 +147,36 @@ def run_consulta_boleto(caminho_entrada, caminho_saida, ano, mes, login=None, se
 
     return result_df
 
+def run_consulta_boleto_from_rows(rows, caminho_saida, ano, mes, login=None, senha=None, max_workers=15):
+    """Executa a consulta a partir de uma lista de rows [(cod_aluno, cpf), ...].
+    Retorna DataFrame com resultados e salva em caminho_saida.
+    """
+    if login is None or senha is None:
+        login = os.getenv('LOGIN')
+        senha = os.getenv('SENHA')
+
+    if not login or not senha:
+        raise ValueError('Credenciais não encontradas. Configure LOGIN e SENHA no .env ou passe como argumento')
+
+    ano_str = str(ano)
+    mes_str = str(mes).zfill(2)
+    prefix = f"{ano_str}-{mes_str}"
+
+    all_records = []
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_row_get_blocks, cod, cpf, login, senha, prefix) for cod, cpf in rows]
+        for future in as_completed(futures):
+            try:
+                res = future.result()
+                all_records.extend(res)
+            except Exception as e:
+                all_records.append({'cod_aluno': '', 'cpf': '', 'status': f'Erro interno: {str(e)}'})
+
+    result_df = pd.DataFrame(all_records)
+    result_df.to_excel(caminho_saida, index=False, engine='openpyxl')
+    return result_df
+
 if __name__ == '__main__':
     print('Módulo consulta_boleto_mensal: executar via import ou chamando run_consulta_boleto')
 import os
