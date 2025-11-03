@@ -833,87 +833,45 @@ class Python4WorkPro:
     def abrir_consulta_boleto_mensal(self):
         """Abre interface para Consulta Boleto Mensal"""
         self.logger.log_user_action("Abriu Consulta Boleto Mensal", session_id=self.session_id)
-        # Perguntar modo de entrada: arquivo ou manual
-        usar_arquivo = messagebox.askyesno("Entrada", "Deseja selecionar um arquivo Excel?\n(Escolha 'Não' para digitar um boleto manual)")
 
+        # Seleção de arquivo de entrada
+        arquivo_entrada = filedialog.askopenfilename(
+            title="Selecione o arquivo Excel com colunas: cod_aluno, cpf",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+
+        if not arquivo_entrada:
+            return
+
+        # Perguntar ano e mês
         from tkinter import simpledialog
+        ano = simpledialog.askinteger("Ano", "Informe o ano (AAAA):", parent=self.root, minvalue=2000, maxvalue=2100)
+        if ano is None:
+            return
+        mes = simpledialog.askinteger("Mês", "Informe o mês (1-12):", parent=self.root, minvalue=1, maxvalue=12)
+        if mes is None:
+            return
 
-        if usar_arquivo:
-            # Seleção de arquivo de entrada
-            arquivo_entrada = filedialog.askopenfilename(
-                title="Selecione o arquivo Excel com colunas: cod_aluno, cpf",
-                filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
-            )
+        # Seleção de arquivo de saída
+        arquivo_saida = filedialog.asksaveasfilename(
+            title="Salvar resultado como",
+            defaultextension=".xlsx",
+            initialfile=f"consulta_boleto_{ano}{str(mes).zfill(2)}_{time.strftime('%Y%m%d_%H%M%S')}.xlsx",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
 
-            if not arquivo_entrada:
-                return
+        if not arquivo_saida:
+            return
 
-            # Perguntar ano e mês
-            ano = simpledialog.askinteger("Ano", "Informe o ano (AAAA):", parent=self.root, minvalue=2000, maxvalue=2100)
-            if ano is None:
-                return
-            mes = simpledialog.askinteger("Mês", "Informe o mês (1-12):", parent=self.root, minvalue=1, maxvalue=12)
-            if mes is None:
-                return
+        # Inicializar barra de progresso e executar
+        self.mostrar_progresso("Consulta Boleto Mensal")
+        self.btn_parar.config(state="normal")
+        self.btn_cancelar.config(state="normal")
 
-            # Seleção de arquivo de saída
-            arquivo_saida = filedialog.asksaveasfilename(
-                title="Salvar resultado como",
-                defaultextension=".xlsx",
-                initialfile=f"consulta_boleto_{ano}{str(mes).zfill(2)}_{time.strftime('%Y%m%d_%H%M%S')}.xlsx",
-                filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
-            )
-
-            if not arquivo_saida:
-                return
-
-            # Inicializar barra de progresso e executar
-            self.mostrar_progresso("Consulta Boleto Mensal")
-            self.btn_parar.config(state="normal")
-            self.btn_cancelar.config(state="normal")
-
-            thread = threading.Thread(target=self.executar_consulta_boleto_mensal,
-                                      args=(arquivo_entrada, arquivo_saida, ano, mes))
-            thread.daemon = True
-            thread.start()
-
-        else:
-            # Entrada manual: solicitar cod_aluno e cpf
-            cod_aluno = simpledialog.askstring("cod_aluno", "Digite o cod_aluno (opcional):", parent=self.root)
-            if cod_aluno is None:
-                return
-            cpf = simpledialog.askstring("cpf", "Digite o CPF (somente números ou formatado):", parent=self.root)
-            if cpf is None:
-                return
-
-            ano = simpledialog.askinteger("Ano", "Informe o ano (AAAA):", parent=self.root, minvalue=2000, maxvalue=2100)
-            if ano is None:
-                return
-            mes = simpledialog.askinteger("Mês", "Informe o mês (1-12):", parent=self.root, minvalue=1, maxvalue=12)
-            if mes is None:
-                return
-
-            arquivo_saida = filedialog.asksaveasfilename(
-                title="Salvar resultado como",
-                defaultextension=".xlsx",
-                initialfile=f"consulta_boleto_{ano}{str(mes).zfill(2)}_{time.strftime('%Y%m%d_%H%M%S')}.xlsx",
-                filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
-            )
-
-            if not arquivo_saida:
-                return
-
-            # Preparar rows e executar
-            rows = [(cod_aluno or '', cpf or '')]
-
-            self.mostrar_progresso("Consulta Boleto Mensal")
-            self.btn_parar.config(state="normal")
-            self.btn_cancelar.config(state="normal")
-
-            thread = threading.Thread(target=self.executar_consulta_boleto_mensal_from_rows,
-                                      args=(rows, arquivo_saida, ano, mes))
-            thread.daemon = True
-            thread.start()
+        thread = threading.Thread(target=self.executar_consulta_boleto_mensal,
+                                  args=(arquivo_entrada, arquivo_saida, ano, mes))
+        thread.daemon = True
+        thread.start()
 
     def executar_consulta_boleto_mensal(self, arquivo_entrada, arquivo_saida, ano, mes):
         """Executa a consulta boleto mensal em background"""
@@ -931,24 +889,6 @@ class Python4WorkPro:
         except Exception as e:
             self.logger.error(f"Erro em Consulta Boleto Mensal: {e}")
             messagebox.showerror("Erro", f"Erro durante a consulta:\n{str(e)}")
-
-        finally:
-            self.voltar_menu()
-
-    def executar_consulta_boleto_mensal_from_rows(self, rows, arquivo_saida, ano, mes):
-        """Executa a consulta boleto mensal a partir de rows [(cod_aluno, cpf), ...]"""
-        try:
-            from src.consulta_boleto_mensal import run_consulta_boleto_from_rows
-
-            self.atualizar_progresso(5, "Iniciando consultas (manual)...")
-            df_result = run_consulta_boleto_from_rows(rows, arquivo_saida, ano, mes)
-
-            self.atualizar_progresso(100, "Consulta manual concluída")
-            messagebox.showinfo("Sucesso", f"Consulta concluída. Arquivo gerado:\n{arquivo_saida}")
-
-        except Exception as e:
-            self.logger.error(f"Erro em Consulta Boleto Mensal (manual): {e}")
-            messagebox.showerror("Erro", f"Erro durante a consulta manual:\n{str(e)}")
 
         finally:
             self.voltar_menu()
