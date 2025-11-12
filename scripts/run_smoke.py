@@ -6,6 +6,11 @@ basic refactor integrity.
 """
 
 import sys
+import os
+
+# Ensure repo root is on sys.path for imports when script is run from scripts/
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, repo_root)
 
 if __name__ == "__main__":
     print("Running smoke checks...")
