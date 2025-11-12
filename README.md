@@ -10,7 +10,7 @@ Sistema profissional integrado para automação de processos financeiros com int
 - **Extrair JSON**: Processa requisições e extrai dados estruturados
 - **Converter CSV/XLSX**: Conversão bidirecional entre formatos
 - **Resolver Duplicatas**: Sistema inteligente para resolver registros duplicados baseado em regras
-- **🛡️ NoLog**: Mantém sua sessão ativa impedindo bloqueio de tela e timeout automático
+- **🛡️ NoLogout**: Mantém sua sessão ativa impedindo bloqueio de tela e timeout automático
 - **🔧 Separador de Dívidas**: Extrai e separa dívidas de XML do Easy Collector em formato JSON legível
 
 ### ✨ Características Avançadas
@@ -80,7 +80,7 @@ cpf | data_pagamento | cod_cliente | cod_acordo | status | observacao
 14416204 | 2025-08-04 | 6778571 | 59213193 | Update | Atualizado - cod_acordo: 59213193
 ```
 
-### 🛡️ NoLog - Manter Sessão Ativa
+### 🛡️ NoLogout - Manter Sessão Ativa
 
 Ferramenta que mantém sua sessão ativa impedindo bloqueio de tela e timeout automático.
 
@@ -99,7 +99,7 @@ Ferramenta que mantém sua sessão ativa impedindo bloqueio de tela e timeout au
 - Sons: Habilitados
 
 **Como usar:**
-1. Clique no card "🛡️ NoLog - Manter Sessão"
+1. Clique no card "🛡️ NoLogout - Manter Sessão"
 2. Clique no botão "▶ INICIAR PROTEÇÃO"
 3. A proteção ficará ativa mantendo sua sessão
 4. Clique em "■ PARAR PROTEÇÃO" quando terminar
@@ -149,9 +149,9 @@ python4Work/
 │   ├── extrair_json_corpo_requisicao.py
 │   ├── conversor_csv_xlsx.py
 │   ├── filtrar_duplicatas.py # Resolver duplicatas
-│   ├── nolog/              # Módulo NoLog (manter sessão ativa)
-│   │   ├── nolog_core.py
-│   │   └── nolog_gui.py
+│   ├── nologout/          # Módulo NoLogout (manter sessão ativa)
+│   │   ├── nologout_core.py
+│   │   └── nologout_gui.py
 │   └── separador_dividas/  # Módulo Separador de Dívidas XML
 │       └── separador_dividas_gui.py
 ├── interfaces/             # Interface gráfica
