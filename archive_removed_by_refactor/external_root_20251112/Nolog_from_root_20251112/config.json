@@ -1,8 +1,0 @@
-{
-    "interval_seconds": 10,
-    "mouse_movement": true,
-    "key_press": true,
-    "prevent_sleep": true,
-    "movement_distance": 1,
-    "sound_enabled": true
-}
