@@ -246,3 +246,20 @@ Este projeto é proprietário. Todos os direitos reservados.
 ---
 
 **Desenvolvido com ❤️ para automação de processos financeiros**
+
+## 🗂️ Consolidação do repositório
+
+Observação: durante uma refatoração o repositório foi consolidado para manter todo o código dentro da pasta
+`python4Work/` (o root do workspace foi limpo). Arquivos e pastas antigos que estavam fora da pasta principal foram
+movidos para o diretório de arquivamento interno:
+
+`python4Work/archive_removed_by_refactor/external_root_20251112/`
+
+Conteúdo arquivado (exemplos):
+- `Nolog_from_root_20251112/` — cópia do antigo pacote `Nolog/` que estava no root
+- `JSON_from_root_20251112/` — scripts utilitários que estavam no root
+- `COMANDOS_EXECUCAO_from_root_20251112.md` — instruções antigas
+
+Motivação: isso mantém o histórico e permite restaurar arquivos antigos, evitando duplicação e confusão entre
+versões do projeto. Se desejar que eu remova definitivamente esse diretório do repositório ou o compacte (zip),
+posso fazê-lo após sua confirmação.
