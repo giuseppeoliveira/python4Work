@@ -24,20 +24,20 @@ if __name__ == "__main__":
         ok = False
 
     try:
-        from src.nologout import NoLogoutCore
-        n = NoLogoutCore()
+        from src.manter_sessao import ManterSessaoCore
+        n = ManterSessaoCore()
         status = n.get_status()
-        print("OK: NoLogoutCore instantiated, status keys:", list(status.keys()))
+        print("OK: ManterSessaoCore instantiated, status keys:", list(status.keys()))
     except Exception as e:
-        print("ERROR with NoLogoutCore:", e)
+        print("ERROR with ManterSessaoCore:", e)
         ok = False
 
     try:
-        from core.theme_manager import ThemeManager
-        tm = ThemeManager()
-        print("OK: ThemeManager default:", tm.get_theme()['name'])
+        from core.theme_manager import GerenciadorTema
+        tm = GerenciadorTema()
+        print("OK: GerenciadorTema default:", tm.get_theme()['name'])
     except Exception as e:
-        print("ERROR with ThemeManager:", e)
+        print("ERROR with GerenciadorTema:", e)
         ok = False
 
     if ok:

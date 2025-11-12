@@ -34,9 +34,9 @@ sys.path.insert(0, str(project_root))
 
 # Importar sistemas profissionais
 from core.config_manager import ConfigManager
-from core.professional_logger import ProfessionalLogger
-from core.data_validator import DataValidator
-from core.theme_manager import ThemeManager
+from core.professional_logger import LoggerProfissional
+from core.data_validator import ValidadorDados
+from core.theme_manager import GerenciadorTema
 
 # Carrega as variáveis de ambiente
 load_dotenv()
@@ -54,17 +54,17 @@ class Python4WorkPro:
         
         # Inicializar sistemas profissionais
         self.config = ConfigManager()
-        self.logger = ProfessionalLogger("Python4WorkPro", self.config)
-        self.validator = DataValidator(self.logger)
-        self.theme_manager = ThemeManager()
-        
+        self.logger = LoggerProfissional("Python4WorkPro", self.config)
+        self.validator = ValidadorDados(self.logger)
+        self.theme_manager = GerenciadorTema()
+
         # Iniciar sessão de logging
         self.session_logger = self.logger.create_session_log(self.session_id)
-        
+
         # Configurar tema
-        # Force corporate theme for the professional UI (consistent branding)
+        # Forçar tema corporativo para a interface profissional (identidade visual)
         self.theme_manager.set_theme('corporate')
-        
+
         # Variáveis de controle
         self.progresso_var = tk.IntVar()
         self.parar_flag = threading.Event()
@@ -100,6 +100,27 @@ class Python4WorkPro:
         
         # Configurar fechamento
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def _create_nolog_popup(self, title: str, geometry: str = "500x400"):
+        """Cria um popup estilizado usando as cores/fontes do Manter Sessão para consistência."""
+        popup = tk.Toplevel(self.root)
+        popup.title(title)
+        popup.geometry(geometry)
+        popup.transient(self.root)
+        try:
+            popup.grab_set()
+        except Exception:
+            pass
+
+    # Paleta Manter Sessão
+        popup._nolog_bg = "#2c3e50"
+        popup._nolog_surface = "#34495e"
+        popup._nolog_text = "#ecf0f1"
+        popup._nolog_muted = "#95a5a6"
+        popup._nolog_font = ("Segoe UI", 10)
+
+        popup.configure(bg=popup._nolog_bg)
+        return popup
     
     def criar_interface_profissional(self):
         """Cria interface profissional com layout moderno"""
@@ -116,8 +137,7 @@ class Python4WorkPro:
         main_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         main_canvas.configure(yscrollcommand=scrollbar.set)
         
-        # Header com informações da aplicação
-        self.criar_header()
+    # Header removed for a compact layout (keeps only direct modules)
         
         # Cards das funcionalidades
         self.criar_cards_funcionalidades()
@@ -138,63 +158,9 @@ class Python4WorkPro:
         main_canvas.bind_all("<MouseWheel>", _on_mousewheel)
     
     def criar_header(self):
-        """Cria header profissional da aplicação"""
-        header_frame = self.theme_manager.create_card_frame(self.scrollable_frame)
-        header_frame.pack(fill='x', padx=20, pady=(20, 10))
-        
-        # Container interno
-        header_content = tk.Frame(header_frame, bg=self.theme_manager.get_color('surface'))
-        header_content.pack(fill='x', padx=20, pady=20)
-        
-        # Título principal
-        title_label = tk.Label(header_content, 
-                              text=f"🏢 {self.config.get('app.name', 'Python4Work Professional')}", 
-                              font=("Arial", 20, "bold"))
-        self.theme_manager.apply_theme_to_widget(title_label, 'title')
-        title_label.pack(anchor='w')
-        
-        # Subtítulo
-        subtitle_label = tk.Label(header_content, 
-                                 text="Central Profissional de Automação de Processos",
-                                 font=("Arial", 12))
-        self.theme_manager.apply_theme_to_widget(subtitle_label, 'description')
-        subtitle_label.pack(anchor='w', pady=(5, 0))
-        
-        # Informações da sessão
-        info_frame = tk.Frame(header_content, bg=self.theme_manager.get_color('surface'))
-        info_frame.pack(fill='x', pady=(15, 0))
-        
-        session_info = f"📋 Sessão: {self.session_id} | 🎨 Tema: {self.theme_manager.get_theme()['name']} | ⚡ Versão: {self.config.get('app.version', '2.0.0')}"
-        info_label = tk.Label(info_frame, text=session_info, font=("Arial", 9))
-        self.theme_manager.apply_theme_to_widget(info_label, 'description')
-        info_label.pack(anchor='w')
-        
-        # Botões de configuração
-        config_frame = tk.Frame(header_content, bg=self.theme_manager.get_color('surface'))
-        config_frame.pack(fill='x', pady=(10, 0))
-        
-        # Botão configurações
-        btn_config = tk.Button(config_frame, text="⚙️ Configurações", 
-                              command=self.abrir_configuracoes,
-                              font=("Arial", 9, "bold"), padx=15, pady=5)
-        self.theme_manager.apply_theme_to_widget(btn_config, 'secondary_button')
-        btn_config.pack(side='left', padx=(0, 10))
-        
-        # Botão relatórios
-        btn_reports = tk.Button(config_frame, text="📊 Relatórios", 
-                               command=self.abrir_relatorios,
-                               font=("Arial", 9, "bold"), padx=15, pady=5)
-        self.theme_manager.apply_theme_to_widget(btn_reports, 'secondary_button')
-        btn_reports.pack(side='left', padx=(0, 10))
-        
-        # Status de conectividade
-        self.status_connectivity = tk.Label(config_frame, text="🔗 Verificando conectividade...", 
-                                           font=("Arial", 9))
-        self.theme_manager.apply_theme_to_widget(self.status_connectivity, 'description')
-        self.status_connectivity.pack(side='right')
-        
-        # Verificar conectividade em background
-        threading.Thread(target=self.verificar_conectividade, daemon=True).start()
+        # Header removed to keep a compact single-screen layout
+        # Kept minimal to avoid syntax errors when header is intentionally omitted.
+        pass
     
     def criar_cards_funcionalidades(self):
         """Cria cards das funcionalidades com design profissional e responsivo"""
@@ -252,7 +218,7 @@ class Python4WorkPro:
                 'row': 2, 'col': 0
             },
             {
-                'titulo': '🛡️ NoLogout - Manter Sessão',
+                'titulo': '🛡️ Manter Sessão',
                 'descricao': 'Mantém sua sessão ativa impedindo bloqueio de tela e timeout',
                 'icone': '🛡️',
                 'cor': 'success',
@@ -416,13 +382,12 @@ class Python4WorkPro:
         
         # --- Modal progress popup (modal) ---
         try:
-            # Create a lightweight modal that shows current progress for long ops
-            self._modal_progress = tk.Toplevel(self.root)
-            self._modal_progress.title("Processando...")
-            self._modal_progress.transient(self.root)
-            self._modal_progress.grab_set()
-            self._modal_progress.geometry("400x120")
-            self._modal_progress.resizable(False, False)
+            # Use centralized NoLogout-styled popup for modal progress
+            self._modal_progress = self._create_nolog_popup("Processando...", geometry="400x120")
+            try:
+                self._modal_progress.resizable(False, False)
+            except Exception:
+                pass
 
             body = tk.Frame(self._modal_progress, bg=self.theme_manager.get_color('surface'))
             body.pack(fill='both', expand=True, padx=12, pady=12)
@@ -530,13 +495,13 @@ class Python4WorkPro:
         """Abre janela de configurações FUNCIONAL"""
         self.logger.log_user_action("Abriu configurações", session_id=self.session_id)
         
-        # Criar janela de configurações
-        config_window = tk.Toplevel(self.root)
-        config_window.title("⚙️ Configurações")
-        config_window.geometry("500x400")
-        config_window.transient(self.root)
-        config_window.grab_set()
-        
+        # Criar janela de configurações usando popup centralizado
+        config_window = self._create_nolog_popup("⚙️ Configurações", geometry="500x400")
+        try:
+            config_window.resizable(False, False)
+        except Exception:
+            pass
+
         # Aplicar tema
         config_window.configure(bg=self.theme_manager.get_color('background'))
         
@@ -632,13 +597,13 @@ class Python4WorkPro:
         """Abre janela de relatórios FUNCIONAL"""
         self.logger.log_user_action("Abriu relatórios", session_id=self.session_id)
         
-        # Criar janela de relatórios
-        report_window = tk.Toplevel(self.root)
-        report_window.title("📊 Relatórios e Logs")
-        report_window.geometry("700x500")
-        report_window.transient(self.root)
-        report_window.grab_set()
-        
+        # Criar janela de relatórios usando popup centralizado
+        report_window = self._create_nolog_popup("📊 Relatórios e Logs", geometry="700x500")
+        try:
+            report_window.resizable(True, True)
+        except Exception:
+            pass
+
         # Aplicar tema
         report_window.configure(bg=self.theme_manager.get_color('background'))
         
@@ -1623,35 +1588,36 @@ class Python4WorkPro:
     
     def abrir_nolog(self):
         """Abre a interface do NoLogout em uma nova janela"""
-        self.logger.log_user_action("Abriu NoLogout", session_id=self.session_id)
+        self.logger.log_user_action("Abriu Manter Sessão", session_id=self.session_id)
         
         try:
-            # Criar nova janela
-            nolog_window = tk.Toplevel(self.root)
-            
-            # Importar e iniciar NoLog GUI
-            from src.nologout import NoLogoutGUI
+            # Criar nova janela usando popup centralizado
+            nolog_window = self._create_nolog_popup("Manter Sessão", geometry="600x420")
 
-            # Criar instância do NoLogout na nova janela
-            nolog_app = NoLogoutGUI(nolog_window)
+            # Importar e iniciar a interface ManterSessao (português)
+            from src.manter_sessao import ManterSessaoGUI
+
+            # Criar instância do ManterSessao na nova janela
+            nolog_app = ManterSessaoGUI(nolog_window)
             
-            self.logger.info("NoLogout iniciado com sucesso")
+            self.logger.info("Manter Sessão iniciado com sucesso")
             
         except Exception as e:
-            self.logger.error(f"Erro ao abrir NoLogout: {e}")
-            messagebox.showerror("Erro", f"Erro ao abrir NoLogout:\n{str(e)}")
+            # Mensagens atualizadas para a nomenclatura em português
+            self.logger.error(f"Erro ao abrir Manter Sessão: {e}")
+            messagebox.showerror("Erro", f"Erro ao abrir Manter Sessão:\n{str(e)}")
     
     def abrir_separador_dividas(self):
         """Abre a interface do Separador de Dívidas em uma nova janela"""
         self.logger.log_user_action("Abriu Separador de Dívidas", session_id=self.session_id)
         
         try:
-            # Criar nova janela
-            separador_window = tk.Toplevel(self.root)
-            
+            # Criar nova janela usando popup centralizado
+            separador_window = self._create_nolog_popup("Separador de Dívidas", geometry="700x520")
+
             # Importar e iniciar Separador GUI
             from src.separador_dividas import SeparadorDividasGUI
-            
+
             # Criar instância do Separador na nova janela
             separador_app = SeparadorDividasGUI(separador_window)
             
@@ -1670,14 +1636,12 @@ class Python4WorkPro:
         self.logger.log_user_action("Abriu Consulta Boleto Mensal", session_id=self.session_id)
 
         try:
-            dialog = tk.Toplevel(self.root)
-            dialog.title("📆 Consulta Boleto Mensal")
-            # Aumentar janela para caber todos os controles e permitir redimensionamento
-            dialog.geometry("900x620")
-            dialog.minsize(700, 520)
-            dialog.resizable(True, True)
-            dialog.transient(self.root)
-            dialog.grab_set()
+            dialog = self._create_nolog_popup("📆 Consulta Boleto Mensal", geometry="900x620")
+            try:
+                dialog.minsize(700, 520)
+                dialog.resizable(True, True)
+            except Exception:
+                pass
             dialog.configure(bg=self.theme_manager.get_color('background'))
 
             container = self.theme_manager.create_card_frame(dialog, "📆 Consulta Boleto Mensal")

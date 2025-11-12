@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Dict, Any
 
-class ThemeManager:
+class GerenciadorTema:
     def __init__(self):
         self.themes = {
             'modern': {
