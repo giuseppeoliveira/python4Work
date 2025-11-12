@@ -1621,8 +1621,8 @@ class Python4WorkPro:
             self.voltar_menu()
     
     def abrir_nolog(self):
-        """Abre a interface do NoLog em uma nova janela"""
-        self.logger.log_user_action("Abriu NoLog", session_id=self.session_id)
+        """Abre a interface do NoLogout em uma nova janela"""
+        self.logger.log_user_action("Abriu NoLogout", session_id=self.session_id)
         
         try:
             # Criar nova janela
@@ -1634,11 +1634,11 @@ class Python4WorkPro:
             # Criar instância do NoLogout na nova janela
             nolog_app = NoLogoutGUI(nolog_window)
             
-            self.logger.info("NoLog iniciado com sucesso")
+            self.logger.info("NoLogout iniciado com sucesso")
             
         except Exception as e:
-            self.logger.error(f"Erro ao abrir NoLog: {e}")
-            messagebox.showerror("Erro", f"Erro ao abrir NoLog:\n{str(e)}")
+            self.logger.error(f"Erro ao abrir NoLogout: {e}")
+            messagebox.showerror("Erro", f"Erro ao abrir NoLogout:\n{str(e)}")
     
     def abrir_separador_dividas(self):
         """Abre a interface do Separador de Dívidas em uma nova janela"""
