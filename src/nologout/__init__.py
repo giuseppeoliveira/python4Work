@@ -1,7 +1,7 @@
 """
-NoLog - Módulo para manter sessão ativa
+NoLogout - Módulo para manter sessão ativa (rename de NoLog)
 """
-from .nolog_core import NoLogCore
-from .nolog_gui import NoLogGUI
+from .nologout_core import NoLogoutCore
+from .nologout_gui import NoLogoutGUI
 
-__all__ = ['NoLogCore', 'NoLogGUI']
+__all__ = ['NoLogoutCore', 'NoLogoutGUI']

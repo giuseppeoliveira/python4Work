@@ -1,5 +1,9 @@
 """
-NoLog Core - Módulo principal para prevenção de logout automático
+NoLogout Core - Módulo principal para prevenção de logout automático
+
+Renomeado de NoLog -> NoLogout para clareza. Esta classe provê a lógica
+de simulação de atividade do usuário para evitar timeout e logout automático
+em estações Windows.
 """
 import ctypes
 import time
@@ -10,8 +14,8 @@ from typing import Dict, Any
 import pyautogui
 
 
-class NoLogCore:
-    """Classe principal para gerenciar a prevenção de logout"""
+class NoLogoutCore:
+    """Classe principal para gerenciar a prevenção de logout (NoLogout)."""
     
     # Constantes do Windows para prevenir suspensão
     ES_CONTINUOUS = 0x80000000
@@ -21,7 +25,7 @@ class NoLogCore:
     
     def __init__(self, config_path: str = "config.json"):
         """
-        Inicializa o NoLogCore
+        Inicializa o NoLogoutCore
         
         Args:
             config_path: Caminho para o arquivo de configuração
@@ -30,9 +34,9 @@ class NoLogCore:
         self.running = False
         self.total_actions = 0
         
-        # Configurações de segurança do pyautogui
-        pyautogui.FAILSAFE = True  # Mover mouse para canto superior esquerdo para parar
-        pyautogui.PAUSE = 0.1
+    # Configurações de segurança do pyautogui
+    pyautogui.FAILSAFE = True  # mover mouse para canto superior esquerdo para interromper
+    pyautogui.PAUSE = 0.1
     
     def play_sound(self, sound_type: str):
         """
@@ -135,23 +139,23 @@ class NoLogCore:
         """
         self.running = True
         self.prevent_sleep_mode(True)
-        
+
         # Toca som de início
         self.play_sound('start')
-        
-        print("🟢 NoLog iniciado!")
+
+        print("🟢 NoLogout iniciado!")
         print(f"⏱️  Intervalo: {self.config['interval_seconds']} segundos")
         print("💡 Pressione Ctrl+C ou mova o mouse para o canto superior esquerdo para parar\n")
-        
+
         try:
             while self.running:
                 success = self.simulate_activity()
-                
+
                 if callback:
                     callback(success, self.total_actions)
-                
+
                 time.sleep(self.config['interval_seconds'])
-                
+
         except KeyboardInterrupt:
             print("\n⚠️  Interrompido pelo usuário")
         except pyautogui.FailSafeException:
@@ -163,11 +167,11 @@ class NoLogCore:
         """Para o serviço de prevenção"""
         self.running = False
         self.prevent_sleep_mode(False)
-        
+
         # Toca som de parada
         self.play_sound('stop')
-        
-        print(f"\n🔴 NoLog parado!")
+
+        print(f"\n🔴 NoLogout parado!")
         print(f"📊 Total de ações executadas: {self.total_actions}")
     
     def get_status(self) -> Dict[str, Any]:
@@ -181,5 +185,5 @@ class NoLogCore:
 
 if __name__ == "__main__":
     # Teste básico
-    nolog = NoLogCore()
+    nolog = NoLogoutCore()
     nolog.start()

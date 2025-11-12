@@ -251,7 +251,7 @@ class Python4WorkPro:
                 'row': 2, 'col': 0
             },
             {
-                'titulo': '🛡️ NoLog - Manter Sessão',
+                'titulo': '🛡️ NoLogout - Manter Sessão',
                 'descricao': 'Mantém sua sessão ativa impedindo bloqueio de tela e timeout',
                 'icone': '🛡️',
                 'cor': 'success',
@@ -1602,10 +1602,10 @@ class Python4WorkPro:
             nolog_window = tk.Toplevel(self.root)
             
             # Importar e iniciar NoLog GUI
-            from src.nolog import NoLogGUI
-            
-            # Criar instância do NoLog na nova janela
-            nolog_app = NoLogGUI(nolog_window)
+            from src.nologout import NoLogoutGUI
+
+            # Criar instância do NoLogout na nova janela
+            nolog_app = NoLogoutGUI(nolog_window)
             
             self.logger.info("NoLog iniciado com sucesso")
             

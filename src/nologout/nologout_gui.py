@@ -1,24 +1,24 @@
 """
-NoLog GUI - Interface gráfica simples e funcional
+NoLogout GUI - Interface gráfica simples e funcional (rename de NoLog)
 """
 import tkinter as tk
 from tkinter import messagebox
 import threading
 from datetime import datetime
 import os
-from .nolog_core import NoLogCore
+from .nologout_core import NoLogoutCore
 
 
-class NoLogGUI:
-    """Interface gráfica para o NoLog"""
+class NoLogoutGUI:
+    """Interface gráfica para o NoLogout"""
     
     def __init__(self, root):
         self.root = root
-        self.root.title("NoLog - Mantenha sua Sessão Ativa")
-        
+        self.root.title("NoLogout - Mantenha sua Sessão Ativa")
+
         # Inicializa o core com caminho correto do config
         config_path = os.path.join(os.path.dirname(__file__), "config.json")
-        self.nolog = NoLogCore(config_path)
+        self.nolog = NoLogoutCore(config_path)
         self.thread = None
         
         # Cores
@@ -79,7 +79,7 @@ class NoLogGUI:
         
         tk.Label(
             title_frame,
-            text="NoLog",
+            text="NoLogout",
             font=("Segoe UI", 22, "bold"),
             bg=self.bg_color,
             fg=self.text_color
@@ -331,7 +331,7 @@ class NoLogGUI:
 def main():
     """Função principal"""
     root = tk.Tk()
-    app = NoLogGUI(root)
+    app = NoLogoutGUI(root)
     root.mainloop()
 
 
