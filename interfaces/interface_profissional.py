@@ -62,8 +62,8 @@ class Python4WorkPro:
         self.session_logger = self.logger.create_session_log(self.session_id)
         
         # Configurar tema
-    # Force corporate theme for the professional UI (consistent branding)
-    self.theme_manager.set_theme('corporate')
+        # Force corporate theme for the professional UI (consistent branding)
+        self.theme_manager.set_theme('corporate')
         
         # Variáveis de controle
         self.progresso_var = tk.IntVar()
