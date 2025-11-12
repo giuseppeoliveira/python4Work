@@ -1634,23 +1634,43 @@ class Python4WorkPro:
             messagebox.showerror("Erro", f"Erro ao abrir Separador de Dívidas:\n{str(e)}")
 
     def abrir_consulta_boleto_mensal(self):
-        """Abre diálogo para executar a Consulta Boleto Mensal"""
+        """Abre diálogo para executar a Consulta Boleto Mensal (arquivo ou manual).
+
+        UI melhorada: permite escolher modo 'Arquivo' ou 'Manual', inserir múltiplos períodos
+        (uma por linha no formato YYYY-MM) e selecionar arquivo de saída.
+        """
         self.logger.log_user_action("Abriu Consulta Boleto Mensal", session_id=self.session_id)
 
         try:
             dialog = tk.Toplevel(self.root)
             dialog.title("📆 Consulta Boleto Mensal")
-            dialog.geometry("520x280")
+            # Aumentar janela para caber todos os controles e permitir redimensionamento
+            dialog.geometry("900x620")
+            dialog.minsize(700, 520)
+            dialog.resizable(True, True)
             dialog.transient(self.root)
             dialog.grab_set()
             dialog.configure(bg=self.theme_manager.get_color('background'))
 
-            frame = tk.Frame(dialog, bg=self.theme_manager.get_color('background'))
-            frame.pack(fill='both', expand=True, padx=20, pady=20)
+            container = self.theme_manager.create_card_frame(dialog, "📆 Consulta Boleto Mensal")
+            container.pack(fill='both', expand=True, padx=16, pady=16)
 
-            tk.Label(frame, text="Arquivo de entrada (Excel)", bg=self.theme_manager.get_color('background')).pack(anchor='w')
-            entry_file = tk.Entry(frame, width=60)
-            entry_file.pack(fill='x')
+            body = tk.Frame(container, bg=self.theme_manager.get_color('surface'))
+            body.pack(fill='both', expand=True, padx=12, pady=12)
+
+            # Modo: arquivo ou manual
+            mode_var = tk.StringVar(value='file')
+            mode_frame = tk.Frame(body, bg=self.theme_manager.get_color('surface'))
+            mode_frame.pack(fill='x', pady=(0, 8))
+            tk.Radiobutton(mode_frame, text='📁 Arquivo (vários alunos)', variable=mode_var, value='file', bg=self.theme_manager.get_color('surface')).pack(side='left', padx=6)
+            tk.Radiobutton(mode_frame, text='⌨️ Manual (colar/um por linha)', variable=mode_var, value='manual', bg=self.theme_manager.get_color('surface')).pack(side='left', padx=6)
+
+            # File selection area
+            file_frame = tk.Frame(body, bg=self.theme_manager.get_color('surface'))
+            file_frame.pack(fill='x', pady=(6, 6))
+            tk.Label(file_frame, text='Arquivo de entrada (Excel):', bg=self.theme_manager.get_color('surface')).pack(anchor='w')
+            entry_file = tk.Entry(file_frame, width=72)
+            entry_file.pack(fill='x', pady=(4, 4))
 
             def pick_input():
                 f = filedialog.askopenfilename(title='Selecione o arquivo Excel', filetypes=[('Excel files','*.xlsx'),('All','*.*')])
@@ -1658,69 +1678,115 @@ class Python4WorkPro:
                     entry_file.delete(0, tk.END)
                     entry_file.insert(0, f)
 
-            tk.Button(frame, text='Escolher...', command=pick_input).pack(pady=(6,10))
+            tk.Button(file_frame, text='Escolher...', command=pick_input).pack(anchor='e')
 
-            row_frame = tk.Frame(frame, bg=self.theme_manager.get_color('background'))
-            row_frame.pack(fill='x')
-            tk.Label(row_frame, text='Ano (YYYY):', bg=self.theme_manager.get_color('background')).pack(side='left')
-            entry_year = tk.Entry(row_frame, width=8)
-            entry_year.pack(side='left', padx=(6,20))
+            # Manual entry area (multiline)
+            manual_frame = tk.Frame(body, bg=self.theme_manager.get_color('surface'))
+            manual_frame.pack(fill='both', pady=(6, 6))
+            tk.Label(manual_frame, text='CPFs (um por linha, sem pontos):', bg=self.theme_manager.get_color('surface')).pack(anchor='w')
+            txt_manual = tk.Text(manual_frame, height=4)
+            txt_manual.pack(fill='x', pady=(4, 4))
 
-            tk.Label(row_frame, text='Mês (MM):', bg=self.theme_manager.get_color('background')).pack(side='left')
-            entry_month = tk.Entry(row_frame, width=4)
-            entry_month.pack(side='left', padx=(6,0))
+            # Periods area - allow multiple YYYY-MM
+            period_frame = tk.Frame(body, bg=self.theme_manager.get_color('surface'))
+            period_frame.pack(fill='both', pady=(6, 6))
+            tk.Label(period_frame, text='Períodos (uma linha por período - ex: 2025-08):', bg=self.theme_manager.get_color('surface')).pack(anchor='w')
+            txt_periods = tk.Text(period_frame, height=3)
+            txt_periods.insert('1.0', f"{time.localtime().tm_year}-{time.localtime().tm_mon:02d}")
+            txt_periods.pack(fill='x', pady=(4, 4))
 
-            tk.Label(frame, text='Arquivo de saída (Excel)', bg=self.theme_manager.get_color('background')).pack(anchor='w', pady=(12,0))
-            entry_out = tk.Entry(frame, width=60)
-            entry_out.pack(fill='x')
+            # Output file
+            out_frame = tk.Frame(body, bg=self.theme_manager.get_color('surface'))
+            out_frame.pack(fill='x', pady=(6, 6))
+            tk.Label(out_frame, text='Arquivo de saída (Excel):', bg=self.theme_manager.get_color('surface')).pack(anchor='w')
+            entry_out = tk.Entry(out_frame, width=72)
+            entry_out.pack(fill='x', pady=(4, 4))
 
             def pick_output():
-                f = filedialog.asksaveasfilename(title='Salvar resultado como', defaultextension='.xlsx', filetypes=[('Excel files','*.xlsx')])
+                default_name = f"consulta_boleto_{time.strftime('%Y%m%d_%H%M%S')}.xlsx"
+                f = filedialog.asksaveasfilename(title='Salvar resultado como', defaultextension='.xlsx', initialfile=default_name, filetypes=[('Excel files','*.xlsx')])
                 if f:
                     entry_out.delete(0, tk.END)
                     entry_out.insert(0, f)
 
-            tk.Button(frame, text='Escolher saída...', command=pick_output).pack(pady=(6,10))
+            tk.Button(out_frame, text='Escolher saída...', command=pick_output).pack(anchor='e')
 
-            btn_frame = tk.Frame(frame, bg=self.theme_manager.get_color('background'))
-            btn_frame.pack(fill='x', pady=(6,0))
+            # Start / Cancel buttons
+            btns = tk.Frame(body, bg=self.theme_manager.get_color('surface'))
+            btns.pack(fill='x', pady=(8, 0))
 
-            def start_process():
-                arquivo_entrada = entry_file.get().strip()
+            def start():
+                mode = mode_var.get()
+                periods_text = txt_periods.get('1.0', 'end').strip()
+                period_lines = [l.strip() for l in periods_text.splitlines() if l.strip()]
                 arquivo_saida = entry_out.get().strip()
-                try:
-                    ano = int(entry_year.get().strip())
-                    mes = int(entry_month.get().strip())
-                except Exception:
-                    messagebox.showerror('Erro', 'Informe ano e mês válidos')
+                if not period_lines:
+                    messagebox.showerror('Erro', 'Informe ao menos um período (ex: 2025-08)')
+                    return
+                if not arquivo_saida:
+                    messagebox.showerror('Erro', 'Selecione arquivo de saída')
                     return
 
-                if not arquivo_entrada or not arquivo_saida:
-                    messagebox.showerror('Erro', 'Selecione arquivo de entrada e saída')
-                    return
+                if mode == 'file':
+                    arquivo_entrada = entry_file.get().strip()
+                    if not arquivo_entrada:
+                        messagebox.showerror('Erro', 'Selecione arquivo de entrada')
+                        return
+                    dialog.destroy()
+                    thread = threading.Thread(target=self.executar_consulta_boleto_thread, args=(arquivo_entrada, arquivo_saida, period_lines, 'file'))
+                    thread.daemon = True
+                    thread.start()
+                else:
+                    manual_text = txt_manual.get('1.0', 'end').strip()
+                    if not manual_text:
+                        messagebox.showerror('Erro', 'Digite ao menos um CPF manualmente')
+                        return
+                    # construir rows a partir dos CPFs manualmente (cod_aluno vazio)
+                    cpfs = [l.strip() for l in re.split(r'[\n,;]+', manual_text) if l.strip()]
+                    rows = [("", c) for c in cpfs]
+                    dialog.destroy()
+                    thread = threading.Thread(target=self.executar_consulta_boleto_thread, args=(rows, arquivo_saida, period_lines, 'manual'))
+                    thread.daemon = True
+                    thread.start()
 
-                dialog.destroy()
-                # iniciar thread
-                thread = threading.Thread(target=self.executar_consulta_boleto_thread, args=(arquivo_entrada, arquivo_saida, ano, mes))
-                thread.daemon = True
-                thread.start()
+            start_btn = tk.Button(btns, text='▶ Iniciar', command=start)
+            self.theme_manager.apply_theme_to_widget(start_btn, 'primary_button')
+            start_btn.pack(side='right')
 
-            tk.Button(btn_frame, text='▶ Iniciar', command=start_process).pack(side='right')
+            cancel_btn = tk.Button(btns, text='❌ Fechar', command=dialog.destroy)
+            self.theme_manager.apply_theme_to_widget(cancel_btn, 'secondary_button')
+            cancel_btn.pack(side='right', padx=(0, 8))
 
         except Exception as e:
             self.logger.error(f"Erro ao abrir Consulta Boleto Mensal: {e}")
             messagebox.showerror('Erro', f'Erro ao abrir Consulta Boleto Mensal:\n{e}')
 
-    def executar_consulta_boleto_thread(self, arquivo_entrada, arquivo_saida, ano, mes):
-        """Thread que executa a consulta boleto mensal usando o módulo implementado"""
+    def executar_consulta_boleto_thread(self, arquivo_entrada, arquivo_saida, ano, mes_or_mode):
+        """Thread que executa a consulta boleto mensal.
+
+        Args:
+            arquivo_entrada: path (str) when mode='file' or list of rows when mode='manual'
+            arquivo_saida: output path
+            ano: in our new contract holds the periods list
+            mes_or_mode: mode string - 'file' or 'manual'
+        """
         try:
-            from src.consulta_boleto_mensal import run_consulta_boleto
+            from src.consulta_boleto_mensal import run_consulta_boleto, run_consulta_boleto_from_rows
 
             self.mostrar_progresso('Consulta Boleto Mensal')
             self.atualizar_progresso(5, 'Iniciando consulta...')
             start = time.time()
 
-            run_consulta_boleto(arquivo_entrada, arquivo_saida, ano, mes)
+            mode = mes_or_mode if isinstance(mes_or_mode, str) else 'file'
+            # In our call we pass periods via the `ano` parameter
+            period_lines = ano
+
+            if mode == 'manual':
+                # arquivo_entrada is actually rows list
+                rows = arquivo_entrada
+                run_consulta_boleto_from_rows(rows, arquivo_saida, period_lines)
+            else:
+                run_consulta_boleto(arquivo_entrada, arquivo_saida, period_lines)
 
             elapsed = time.time() - start
             self.atualizar_progresso(100, f'Concluído em {elapsed:.1f}s')
