@@ -103,3 +103,7 @@ dmypy.json
 # Logs
 *.log
 log_*.txt
+
+# Project cleanup
+archive_removed_by_refactor/
+logs/
