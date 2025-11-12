@@ -412,6 +412,33 @@ class Python4WorkPro:
         self.scrollable_frame.update()
         
         self.logger.log_operation_start(operacao_nome, session_id=self.session_id)
+        
+        # --- Modal progress popup (modal) ---
+        try:
+            # Create a lightweight modal that shows current progress for long ops
+            self._modal_progress = tk.Toplevel(self.root)
+            self._modal_progress.title("Processando...")
+            self._modal_progress.transient(self.root)
+            self._modal_progress.grab_set()
+            self._modal_progress.geometry("400x120")
+            self._modal_progress.resizable(False, False)
+
+            body = tk.Frame(self._modal_progress, bg=self.theme_manager.get_color('surface'))
+            body.pack(fill='both', expand=True, padx=12, pady=12)
+
+            lbl = tk.Label(body, text=f"{operacao_nome}", font=("Arial", 11, 'bold'), bg=self.theme_manager.get_color('surface'))
+            self.theme_manager.apply_theme_to_widget(lbl, 'subtitle')
+            lbl.pack(anchor='w', pady=(0, 8))
+
+            self._modal_progress_bar = ttk.Progressbar(body, variable=self.progresso_var, maximum=100, length=340)
+            self._modal_progress_bar.pack(pady=(4, 8))
+
+            self._modal_progress_info = tk.Label(body, text="Aguardando...", bg=self.theme_manager.get_color('surface'))
+            self.theme_manager.apply_theme_to_widget(self._modal_progress_info, 'description')
+            self._modal_progress_info.pack(anchor='w')
+        except Exception:
+            # If modal creation fails for any reason, continue without modal
+            self._modal_progress = None
     
     def atualizar_progresso(self, progresso, status="Processando..."):
         """Atualiza barra de progresso e status"""
@@ -432,6 +459,20 @@ class Python4WorkPro:
         if self.current_operation:
             self.logger.log_operation_end(self.current_operation, session_id=self.session_id)
         self.current_operation = None
+        # Destroy modal if present
+        try:
+            if hasattr(self, '_modal_progress') and self._modal_progress:
+                try:
+                    self._modal_progress.grab_release()
+                except Exception:
+                    pass
+                try:
+                    self._modal_progress.destroy()
+                except Exception:
+                    pass
+                self._modal_progress = None
+        except Exception:
+            pass
     
     def voltar_menu(self):
         """Volta para o menu principal"""
@@ -508,23 +549,9 @@ class Python4WorkPro:
         self.theme_manager.apply_theme_to_widget(title_label, 'title')
         title_label.pack(pady=(0, 20))
         
-        # Configurações de tema
-        theme_frame = tk.LabelFrame(main_frame, text="🎨 Tema Visual", 
-                                   font=("Arial", 10, "bold"), padx=10, pady=10)
-        self.theme_manager.apply_theme_to_widget(theme_frame, 'surface')
-        theme_frame.pack(fill='x', pady=(0, 15))
-        
-        current_theme = self.config.get('app.theme', 'modern')
-        theme_var = tk.StringVar(value=current_theme)
-        
-        themes = [("🌟 Moderno", "modern"), ("🌙 Escuro", "dark"), 
-                 ("🏢 Corporativo", "corporate"), ("🌿 Natureza", "nature")]
-        
-        for text, value in themes:
-            rb = tk.Radiobutton(theme_frame, text=text, variable=theme_var, value=value,
-                               command=lambda v=value: self.aplicar_tema(v))
-            self.theme_manager.apply_theme_to_widget(rb, 'surface')
-            rb.pack(anchor='w')
+        # Theme selection removed — UI now uses a single corporate blue theme
+        # to keep the professional appearance consistent. Theme is controlled
+        # centrally by ThemeManager (default: 'corporate').
         
         # Configurações de logging
         log_frame = tk.LabelFrame(main_frame, text="📝 Sistema de Logging", 
@@ -545,7 +572,7 @@ class Python4WorkPro:
         button_frame.pack(fill='x', pady=(20, 0))
         
         def salvar_config():
-            self.config.set('app.theme', theme_var.get())
+            # Do not allow changing the theme from the UI; keep corporate theme.
             self.config.set('logging.level', log_level_var.get())
             messagebox.showinfo("Sucesso", "Configurações salvas!\nReinicie para aplicar todas as mudanças.")
             config_window.destroy()
