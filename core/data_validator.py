@@ -253,6 +253,82 @@ class DataValidator:
         
         return None
     
+    def validate_cpf(self, cpf: str, strict: bool = False) -> bool:
+        """
+        Método público para validar CPF
+        Args:
+            cpf (str): CPF para validar (pode conter pontos e traços)
+            strict (bool): Se True, faz validação rigorosa dos dígitos verificadores
+        Returns:
+            bool: True se CPF é válido, False caso contrário
+        """
+        if not cpf:
+            return False
+            
+        # Limpar CPF removendo pontos, traços e espaços
+        clean_cpf = re.sub(r'[^\d]', '', str(cpf))
+        
+        # Se o CPF tem menos de 11 dígitos, preencher com zeros à esquerda
+        # Isso é comum quando o Excel remove zeros iniciais
+        if len(clean_cpf) < 11 and len(clean_cpf) > 0:
+            clean_cpf = clean_cpf.zfill(11)
+            # Log apenas se o logger estiver disponível
+            if self.logger:
+                self.logger.info(f"CPF '{cpf}' ajustado para: '{clean_cpf}'")
+        
+        # Verificar se tem exatamente 11 dígitos após ajuste
+        if len(clean_cpf) != 11:
+            return False
+        
+        # Verificar se não é uma sequência de números iguais (ex: 11111111111)
+        if clean_cpf == clean_cpf[0] * 11:
+            return False
+        
+        # Verificar se não é um CPF óbvio inválido (ex: 00000000000)
+        if clean_cpf in ['00000000000', '11111111111', '22222222222', 
+                        '33333333333', '44444444444', '55555555555',
+                        '66666666666', '77777777777', '88888888888', '99999999999']:
+            return False
+        
+        # Validação rigorosa apenas se solicitada
+        if strict:
+            return self._validate_cpf(clean_cpf)
+            
+        # Para processamento em lote, aceitar CPFs com formato correto
+        return True  # Aceita qualquer CPF com 11 dígitos que não seja sequência repetida
+    
+    def normalize_cpf(self, cpf: str) -> str:
+        """
+        Normaliza e corrige um CPF, adicionando zeros à esquerda se necessário
+        Args:
+            cpf (str): CPF para normalizar
+        Returns:
+            str: CPF normalizado com 11 dígitos ou string vazia se inválido
+        """
+        if not cpf:
+            return ""
+            
+        # Limpar CPF removendo pontos, traços e espaços
+        clean_cpf = re.sub(r'[^\d]', '', str(cpf))
+        
+        # Se o CPF tem menos de 11 dígitos, preencher com zeros à esquerda
+        if len(clean_cpf) < 11 and len(clean_cpf) > 0:
+            clean_cpf = clean_cpf.zfill(11)
+        
+        # Verificar se tem exatamente 11 dígitos após ajuste
+        if len(clean_cpf) != 11:
+            return ""
+        
+        # Verificar se não é uma sequência de números iguais ou inválidos
+        if clean_cpf == clean_cpf[0] * 11 or clean_cpf in [
+            '00000000000', '11111111111', '22222222222', '33333333333', 
+            '44444444444', '55555555555', '66666666666', '77777777777', 
+            '88888888888', '99999999999'
+        ]:
+            return ""
+            
+        return clean_cpf
+    
     def _validate_cpf(self, cpf: str) -> bool:
         """Valida dígitos verificadores do CPF"""
         if len(cpf) != 11 or cpf == cpf[0] * 11:

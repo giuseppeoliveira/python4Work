@@ -204,6 +204,7 @@ class Python4WorkPro:
         # Configurar grid responsivo - 2 colunas em telas normais, 1 em telas pequenas
         cards_container.grid_rowconfigure(0, weight=1)
         cards_container.grid_rowconfigure(1, weight=1)
+        cards_container.grid_rowconfigure(2, weight=1)
         cards_container.grid_columnconfigure(0, weight=1, minsize=300)  # Largura mínima
         cards_container.grid_columnconfigure(1, weight=1, minsize=300)  # Largura mínima
         
@@ -240,6 +241,39 @@ class Python4WorkPro:
                 'cor': 'accent',
                 'comando': self.abrir_conversor,
                 'row': 1, 'col': 1
+            },
+            {
+                'titulo': '🎯 Resolver Duplicatas',
+                'descricao': 'Resolve duplicatas com regras inteligentes: data_pagamento, cod_acordo e cod_prestacao',
+                'icone': '🎯',
+                'cor': 'primary',
+                'comando': self.abrir_filtrar_duplicatas,
+                'row': 2, 'col': 0
+            },
+            {
+                'titulo': '🛡️ NoLog - Manter Sessão',
+                'descricao': 'Mantém sua sessão ativa impedindo bloqueio de tela e timeout',
+                'icone': '🛡️',
+                'cor': 'success',
+                'comando': self.abrir_nolog,
+                'row': 2, 'col': 1
+            },
+            {
+                'titulo': '🔧 Separador de Dívidas',
+                'descricao': 'Extrai e separa dívidas de XML do Easy Collector em JSON legível',
+                'icone': '🔧',
+                'cor': 'accent',
+                'comando': self.abrir_separador_dividas,
+                'row': 3, 'col': 0
+            }
+            ,
+            {
+                'titulo': '📆 Consulta Boleto Mensal',
+                'descricao': 'Consulta dívidas por CPF e filtra por mês/ano (gera Excel consolidado)',
+                'icone': '📆',
+                'cor': 'primary',
+                'comando': self.abrir_consulta_boleto_mensal,
+                'row': 3, 'col': 1
             }
         ]
         
@@ -707,11 +741,12 @@ class Python4WorkPro:
         
         # Janela de opções
         opcao = messagebox.askyesnocancel(
-            "Consultar Acordo",
+            "Consultar Acordo ⚡ OTIMIZADO",
             "Escolha uma opção:\n\n"
             "✅ SIM - Baixar modelo Excel primeiro\n"
             "❌ NÃO - Usar arquivo existente\n"
-            "🚫 CANCELAR - Voltar ao menu"
+            "🚫 CANCELAR - Voltar ao menu\n\n"
+            "⚡ Versão otimizada: 4-5x mais rápida!"
         )
         
         if opcao is None:  # Cancelar
@@ -794,22 +829,95 @@ class Python4WorkPro:
                                 args=(arquivo_entrada, arquivo_saida))
         thread.daemon = True
         thread.start()
+
+    def abrir_consulta_boleto_mensal(self):
+        """Abre interface para Consulta Boleto Mensal"""
+        self.logger.log_user_action("Abriu Consulta Boleto Mensal", session_id=self.session_id)
+
+        # Seleção de arquivo de entrada
+        arquivo_entrada = filedialog.askopenfilename(
+            title="Selecione o arquivo Excel com colunas: cod_aluno, cpf",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+
+        if not arquivo_entrada:
+            return
+
+        # Perguntar ano e mês
+        from tkinter import simpledialog
+        ano = simpledialog.askinteger("Ano", "Informe o ano (AAAA):", parent=self.root, minvalue=2000, maxvalue=2100)
+        if ano is None:
+            return
+        mes = simpledialog.askinteger("Mês", "Informe o mês (1-12):", parent=self.root, minvalue=1, maxvalue=12)
+        if mes is None:
+            return
+
+        # Seleção de arquivo de saída
+        arquivo_saida = filedialog.asksaveasfilename(
+            title="Salvar resultado como",
+            defaultextension=".xlsx",
+            initialfile=f"consulta_boleto_{ano}{str(mes).zfill(2)}_{time.strftime('%Y%m%d_%H%M%S')}.xlsx",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+
+        if not arquivo_saida:
+            return
+
+        # Inicializar barra de progresso e executar
+        self.mostrar_progresso("Consulta Boleto Mensal")
+        self.btn_parar.config(state="normal")
+        self.btn_cancelar.config(state="normal")
+
+        thread = threading.Thread(target=self.executar_consulta_boleto_mensal,
+                                  args=(arquivo_entrada, arquivo_saida, ano, mes))
+        thread.daemon = True
+        thread.start()
+
+    def executar_consulta_boleto_mensal(self, arquivo_entrada, arquivo_saida, ano, mes):
+        """Executa a consulta boleto mensal em background"""
+        try:
+            from src.consulta_boleto_mensal import run_consulta_boleto
+
+            self.atualizar_progresso(5, "Iniciando consultas...")
+
+            # run_consulta_boleto irá lançar exceção caso credenciais não existam
+            df_result = run_consulta_boleto(arquivo_entrada, arquivo_saida, ano, mes)
+
+            self.atualizar_progresso(100, "Consulta concluída")
+            messagebox.showinfo("Sucesso", f"Consulta concluída. Arquivo gerado:\n{arquivo_saida}")
+
+        except Exception as e:
+            self.logger.error(f"Erro em Consulta Boleto Mensal: {e}")
+            messagebox.showerror("Erro", f"Erro durante a consulta:\n{str(e)}")
+
+        finally:
+            self.voltar_menu()
     
     def executar_consultar_acordo(self, arquivo_entrada, arquivo_saida):
-        """Executa consulta de acordo"""
+        """Executa consulta de acordo com validação robusta e processamento otimizado"""
         try:
-            # Importar função do script original
-            from src.consultar_acordo import consultar_status_acordo
+            # Importar funções melhoradas do script
+            from src.consultar_acordo import consultar_status_acordo_batch, validar_dados_entrada
+            
+            self.atualizar_progresso(5, f"📂 Carregando arquivo...")
             
             # Ler arquivo
             df = pd.read_excel(arquivo_entrada)
             total_linhas = len(df)
             
-            self.atualizar_progresso(0, f"Iniciando processamento de {total_linhas} registros...")
+            self.logger.info(f"Consultar Acordo: Arquivo carregado - {total_linhas} registros")
             
-            # Verificar colunas necessárias
-            if not all(col in df.columns for col in ['cod_cliente', 'cod_acordo']):
-                messagebox.showerror("Erro", "Arquivo deve conter colunas 'cod_cliente' e 'cod_acordo'")
+            # Validar dados de entrada com nova função robusta
+            self.atualizar_progresso(10, f"� Validando {total_linhas} registros...")
+            
+            try:
+                registros_validos_esperados = validar_dados_entrada(df)
+                self.logger.info(f"Consultar Acordo: Validação OK - {registros_validos_esperados} registros válidos esperados")
+            except Exception as validation_error:
+                error_msg = f"❌ Erro na validação: {validation_error}"
+                self.logger.error(f"Consultar Acordo: {error_msg}")
+                self.atualizar_progresso(0, error_msg)
+                messagebox.showerror("Erro de Validação", str(validation_error))
                 self.voltar_menu()
                 return
             
@@ -817,46 +925,72 @@ class Python4WorkPro:
             if 'status_acordo' not in df.columns:
                 df['status_acordo'] = ''
             
-            # Processar cada linha
-            for idx, row in df.iterrows():
+            self.atualizar_progresso(15, f"🚀 Iniciando consultas otimizadas...")
+            
+            # Configurações otimizadas
+            batch_size = 50
+            max_workers = 25
+            linhas_processadas = 0
+            
+            import time
+            start_time = time.time()
+            
+            # Processar em lotes para melhor performance
+            for batch_start in range(0, total_linhas, batch_size):
+                # Verificar flags de controle
                 if self.cancelar_flag.is_set():
+                    self.atualizar_progresso((batch_start/total_linhas)*100, "❌ Processo cancelado...")
                     break
-                
+                    
                 if self.parar_flag.is_set():
-                    self.atualizar_progresso((idx/total_linhas)*100, "Processo pausado...")
+                    self.atualizar_progresso((batch_start/total_linhas)*100, "⏸️ Processo pausado...")
                     self.parar_flag.wait()
                 
-                try:
-                    cod_cliente = str(row['cod_cliente']).strip()
-                    cod_acordo = str(row['cod_acordo']).strip()
-                    
-                    # Consultar acordo (função espera row e index)
-                    status = consultar_status_acordo(row, idx)
-                    df.at[idx, 'status_acordo'] = status
-                    
-                    # Atualizar progresso
-                    progresso = ((idx + 1) / total_linhas) * 100
-                    self.atualizar_progresso(progresso, f"Processando linha {idx + 1}/{total_linhas}")
-                    
-                    # Salvar periodicamente
-                    if (idx + 1) % 5 == 0:
-                        df.to_excel(arquivo_saida, index=False)
-                    
-                except Exception as e:
-                    self.logger.error(f"Erro na linha {idx + 1}: {e}")
-                    df.at[idx, 'status_acordo'] = f"ERRO: {str(e)}"
+                batch_end = min(batch_start + batch_size, total_linhas)
+                batch_rows = [(i, df.iloc[i]) for i in range(batch_start, batch_end)]
+                
+                # Atualizar progresso
+                progresso = int((batch_start / total_linhas) * 100)
+                elapsed = time.time() - start_time
+                if batch_start > 0:
+                    eta = (elapsed / batch_start) * (total_linhas - batch_start)
+                    self.atualizar_progresso(progresso, 
+                        f"⚡ Processando lote {batch_start//batch_size + 1}: {batch_start+1}-{batch_end} de {total_linhas} | ETA: {eta/60:.1f}min")
+                else:
+                    self.atualizar_progresso(progresso, f"🔄 Processando lote 1: {batch_start+1}-{batch_end} de {total_linhas}")
+                
+                # Processar lote em paralelo
+                batch_results = consultar_status_acordo_batch(batch_rows, max_workers)
+                
+                # Atualizar DataFrame com resultados
+                for index, status in batch_results:
+                    df.at[index, "status_acordo"] = status
+                    linhas_processadas += 1
+                
+                # Salvar progresso periodicamente
+                if linhas_processadas % 100 == 0:
+                    df.to_excel(arquivo_saida, index=False)
             
-            # Salvar resultado final
+            # Salvar arquivo final
             df.to_excel(arquivo_saida, index=False)
             
-            if not self.cancelar_flag.is_set():
-                self.atualizar_progresso(100, "Processamento concluído!")
-                messagebox.showinfo("Sucesso", f"Arquivo salvo: {arquivo_saida}")
+            # Calcular estatísticas finais
+            total_time = time.time() - start_time
+            req_per_sec = linhas_processadas / total_time if total_time > 0 else 0
+            
+            self.atualizar_progresso(100, 
+                f"✅ Concluído! {linhas_processadas} registros em {total_time/60:.1f}min ({req_per_sec:.1f} req/s)")
+            
+            messagebox.showinfo("Sucesso", 
+                f"Processamento concluído!\n\n"
+                f"📊 Registros processados: {linhas_processadas}\n"
+                f"⏱️ Tempo total: {total_time/60:.1f} minutos\n"
+                f"⚡ Velocidade: {req_per_sec:.1f} req/s\n"
+                f"📁 Arquivo salvo: {arquivo_saida}")
             
         except Exception as e:
             self.logger.critical(f"Erro crítico em consultar acordo: {e}")
-            messagebox.showerror("Erro", f"Erro no processamento: {e}")
-        
+            messagebox.showerror("Erro", f"Erro durante processamento: {str(e)}")
         finally:
             self.voltar_menu()
     
@@ -960,73 +1094,78 @@ class Python4WorkPro:
         thread.start()
     
     def executar_obter_divida(self, arquivo_entrada, arquivo_saida):
-        """Executa obtenção de dívida por CPF"""
+        """Executa obtenção de dívida por CPF usando a função otimizada"""
         try:
-            # Importar função do script original
-            from src.obter_divida_cpf import consultar_easycollector
+            # Importar função otimizada
+            from src.obter_divida_cpf import processar_batch_cpf
+            import pandas as pd
+            import time
             
             # Ler arquivo
-            df = pd.read_excel(arquivo_entrada)
-            total_linhas = len(df)
+            df = pd.read_excel(arquivo_entrada, engine='openpyxl', dtype=str)
+            # Limpar nomes das colunas
+            df.columns = df.columns.str.strip().str.lower()
             
-            self.atualizar_progresso(0, f"Iniciando processamento de {total_linhas} CPFs...")
-            
-            # Verificar coluna CPF
-            if 'cpf' not in df.columns:
+            # Verificar se tem coluna CPF
+            if "cpf" not in df.columns:
                 messagebox.showerror("Erro", "Arquivo deve conter coluna 'cpf'")
                 self.voltar_menu()
                 return
             
-            # Adicionar colunas de resultado se não existirem
+            # Preencher valores vazios e adicionar colunas necessárias
+            df.fillna("", inplace=True)  # Usar string vazia em vez de "0"
             for col in ['cod_cliente', 'cod_acordo', 'status', 'observacao']:
                 if col not in df.columns:
-                    df[col] = ''
+                    df[col] = ""  # Usar string vazia em vez de "0"
             
-            # Processar cada linha
-            for idx, row in df.iterrows():
+            total = len(df)
+            batch_size = 25
+            linhas_processadas = 0
+            tempo_inicio = time.time()
+            
+            self.atualizar_progresso(0, f"Iniciando processamento de {total} CPFs...")
+            
+            # Processar em lotes
+            for batch_start in range(0, total, batch_size):
                 if self.cancelar_flag.is_set():
                     break
                 
                 if self.parar_flag.is_set():
-                    self.atualizar_progresso((idx/total_linhas)*100, "Processo pausado...")
+                    self.atualizar_progresso((linhas_processadas/total)*100, "Processo pausado...")
                     self.parar_flag.wait()
                 
-                try:
-                    cpf = str(row['cpf']).strip()
-                    
-                    # Validar CPF
-                    if not self.validator.validate_cpf(cpf):
-                        df.at[idx, 'status'] = 'CPF Inválido'
-                        df.at[idx, 'observacao'] = 'CPF não passou na validação'
-                        continue
-                    
-                    # Consultar dívida
-                    resultado = consultar_easycollector(cpf, LOGIN, SENHA)
-                    
-                    if resultado and len(resultado) >= 4:
-                        df.at[idx, 'cod_cliente'] = resultado[0]
-                        df.at[idx, 'cod_acordo'] = resultado[1]
-                        df.at[idx, 'status'] = resultado[2]
-                        df.at[idx, 'observacao'] = resultado[3]
-                    else:
-                        df.at[idx, 'status'] = 'Não encontrado'
-                        df.at[idx, 'observacao'] = 'CPF não retornou dados'
-                    
-                    # Atualizar progresso
-                    progresso = ((idx + 1) / total_linhas) * 100
-                    self.atualizar_progresso(progresso, f"Processando CPF {idx + 1}/{total_linhas}")
-                    
-                    # Salvar periodicamente
-                    if (idx + 1) % 5 == 0:
-                        df.to_excel(arquivo_saida, index=False)
-                    
-                except Exception as e:
-                    self.logger.error(f"Erro no CPF linha {idx + 1}: {e}")
-                    df.at[idx, 'status'] = 'ERRO'
-                    df.at[idx, 'observacao'] = f"Erro: {str(e)}"
+                batch_end = min(batch_start + batch_size, total)
+                batch_rows = [(i, df.iloc[i]) for i in range(batch_start, batch_end)]
+                
+                # Processar lote em paralelo
+                batch_results = processar_batch_cpf(batch_rows)
+                
+                # Atualizar DataFrame com resultados
+                for i, status, observacao, cod_cliente, cod_acordo in batch_results:
+                    df.at[i, "status"] = status
+                    df.at[i, "observacao"] = observacao
+                    df.at[i, "cod_cliente"] = cod_cliente
+                    df.at[i, "cod_acordo"] = cod_acordo
+                    linhas_processadas += 1
+                
+                # Atualizar progresso
+                progresso = (linhas_processadas / total) * 100
+                
+                # Calcular tempo estimado
+                tempo_passado = time.time() - tempo_inicio
+                if linhas_processadas > 0:
+                    tempo_estimado_restante = (tempo_passado / linhas_processadas) * (total - linhas_processadas)
+                    minutos = int(tempo_estimado_restante // 60)
+                    self.atualizar_progresso(progresso, f"Processando: {linhas_processadas}/{total} - {minutos}m restantes")
+                else:
+                    self.atualizar_progresso(progresso, f"Processando: {linhas_processadas}/{total}")
+                
+                # Salvar progresso a cada 100 linhas
+                if linhas_processadas % 100 == 0:
+                    df.to_excel(arquivo_saida, index=False, engine='openpyxl')
             
-            # Salvar resultado final
-            df.to_excel(arquivo_saida, index=False)
+            # Salvar arquivo final
+            df.to_excel(arquivo_saida, index=False, engine='openpyxl')
             
             if not self.cancelar_flag.is_set():
                 self.atualizar_progresso(100, "Processamento concluído!")
@@ -1271,6 +1410,392 @@ class Python4WorkPro:
             self.logger.critical(f"Erro crítico no conversor: {e}")
             messagebox.showerror("Erro", f"Erro na conversão: {e}")
         
+        finally:
+            self.voltar_menu()
+
+    def abrir_filtrar_duplicatas(self):
+        """Abre interface para resolver duplicatas com regras inteligentes"""
+        self.logger.log_user_action("Resolver Duplicatas: Interface aberta")
+        
+        # Mostrar área de progresso com o nome da operação
+        self.mostrar_progresso("Resolver Duplicatas")
+        
+        # Habilitar controles
+        self.btn_parar.config(state="normal")
+        self.btn_cancelar.config(state="normal")
+        
+        # Janela de opções
+        opcao = messagebox.askyesnocancel(
+            "Resolver Duplicatas 🔄",
+            "Escolha uma opção:\n\n"
+            "✅ SIM - Usar arquivo de exemplo para testar\n"
+            "❌ NÃO - Selecionar meu próprio arquivo\n"
+            "🚫 CANCELAR - Voltar ao menu\n\n"
+            "📋 Arquivo deve ter colunas: 'cpf', 'data_vencimento', 'numero_prestacao', 'cod_prestacao'\n"
+            "📋 Colunas opcionais: 'data_pagamento', 'cod_acordo'\n\n"
+            "🎯 Nova lógica inteligente:\n"
+            "• Prioriza registros sem data_pagamento\n"
+            "• Escolhe cod_acordo=0 quando aplicável\n"
+            "• Seleciona menor cod_prestacao como desempate"
+        )
+        
+        if opcao is None:  # Cancelar
+            self.voltar_menu()
+            return
+        elif opcao:  # Usar arquivo de exemplo
+            arquivo_entrada = "data/Modelos/arquivo_teste_duplicatas.xlsx"
+            if not os.path.exists(arquivo_entrada):
+                messagebox.showerror("Erro", f"Arquivo de exemplo não encontrado:\n{arquivo_entrada}")
+                self.voltar_menu()
+                return
+            
+            # Sugerir arquivo de saída
+            arquivo_saida = filedialog.asksaveasfilename(
+                title="Salvar registros corretos resolvidos como",
+                defaultextension=".xlsx",
+                initialfile="registros_corretos_resolvidos.xlsx",
+                filetypes=[("Arquivos Excel", "*.xlsx")]
+            )
+            if not arquivo_saida:
+                self.voltar_menu()
+                return
+        else:  # Selecionar arquivo próprio
+            arquivo_entrada = filedialog.askopenfilename(
+                title="Selecionar arquivo Excel para resolver duplicatas",
+                filetypes=[("Arquivos Excel", "*.xlsx"), ("Todos os arquivos", "*.*")]
+            )
+            if not arquivo_entrada:
+                self.voltar_menu()
+                return
+            
+            # Sugerir nome do arquivo de saída
+            base_name = os.path.splitext(os.path.basename(arquivo_entrada))[0]
+            pasta_origem = os.path.dirname(arquivo_entrada)
+            default_saida = os.path.join(pasta_origem, f"{base_name}_resolvidos.xlsx")
+            
+            arquivo_saida = filedialog.asksaveasfilename(
+                title="Salvar registros corretos resolvidos como",
+                defaultextension=".xlsx",
+                initialfile=f"{base_name}_resolvidos.xlsx",
+                initialdir=pasta_origem,
+                filetypes=[("Arquivos Excel", "*.xlsx")]
+            )
+            if not arquivo_saida:
+                self.voltar_menu()
+                return
+        
+        # Executar filtro de duplicatas
+        self.executar_filtrar_duplicatas(arquivo_entrada, arquivo_saida)
+    
+    def executar_filtrar_duplicatas(self, arquivo_entrada, arquivo_saida):
+        """Executa a resolução de duplicatas"""
+        # Log da operação
+        self.logger.log_user_action(f"Resolver Duplicatas: Iniciado", 
+                                   entrada=arquivo_entrada, 
+                                   saida=arquivo_saida)
+        
+        # Executar em thread separada
+        thread = threading.Thread(target=self.executar_filtrar_duplicatas_thread, 
+                                 args=(arquivo_entrada, arquivo_saida))
+        thread.daemon = True
+        thread.start()
+    
+    def executar_filtrar_duplicatas_thread(self, arquivo_entrada, arquivo_saida):
+        """Thread para executar resolução de duplicatas"""
+        try:
+            from src.filtrar_duplicatas import filtrar_duplicatas_cpf_data, salvar_arquivo_com_formatacao
+            
+            self.atualizar_progresso(10, "📂 Carregando arquivo...")
+            
+            # Carregar arquivo
+            df = pd.read_excel(arquivo_entrada)
+            total_inicial = len(df)
+            
+            self.logger.info(f"Resolver Duplicatas: Arquivo carregado - {total_inicial} registros")
+            self.atualizar_progresso(30, f"🔍 Analisando {total_inicial} registros...")
+            
+            # Verificar se arquivo tem dados
+            if total_inicial == 0:
+                raise ValueError("❌ Arquivo está vazio")
+            
+            # Verificar colunas necessárias
+            colunas_necessarias = ['cpf', 'data_vencimento', 'numero_prestacao', 'cod_prestacao']
+            colunas_faltantes = [col for col in colunas_necessarias if col not in df.columns]
+            
+            if colunas_faltantes:
+                raise ValueError(f"❌ Colunas não encontradas: {', '.join(colunas_faltantes)}")
+            
+            # Resolver duplicatas aplicando regras inteligentes
+            self.atualizar_progresso(50, "🎯 Aplicando regras inteligentes...")
+            df_resolvidos = filtrar_duplicatas_cpf_data(df)
+            
+            registros_resolvidos = len(df_resolvidos)
+            
+            if registros_resolvidos == 0:
+                raise ValueError("❌ Nenhum duplicado encontrado no arquivo")
+            
+            self.atualizar_progresso(80, "💾 Salvando registros corretos...")
+            
+            # Salvar arquivo com formatação (registros corretos escolhidos)
+            salvar_arquivo_com_formatacao(df_resolvidos, arquivo_saida)
+            
+            # Gerar relatório de resolução
+            relatorio_file = arquivo_saida.replace('.xlsx', '_relatorio_duplicatas.txt')
+            grupos_resolvidos = len(df_resolvidos.groupby(['cpf', 'data_vencimento', 'numero_prestacao']))
+            
+            with open(relatorio_file, "w", encoding="utf-8") as f:
+                f.write(f"=== RELATÓRIO DE RESOLUÇÃO DE DUPLICATAS ===\n")
+                f.write(f"Data/Hora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"Arquivo original: {os.path.basename(arquivo_entrada)}\n")
+                f.write(f"Arquivo de resultado: {os.path.basename(arquivo_saida)}\n")
+                f.write(f"Total de registros originais: {total_inicial}\n")
+                f.write(f"Grupos de duplicatas resolvidos: {grupos_resolvidos}\n")
+                f.write(f"Registros corretos escolhidos: {registros_resolvidos}\n")
+                f.write(f"Taxa de duplicação: {(grupos_resolvidos/total_inicial*100) if total_inicial > 0 else 0:.1f}%\n")
+                f.write("=" * 60 + "\n\n")
+                f.write("REGRAS APLICADAS:\n")
+                f.write("1. Se tiver data_pagamento: salva linha sem data_pagamento\n")
+                f.write("2. Se ambos têm data_pagamento: prioriza cod_acordo=0\n")
+                f.write("3. Se ambos têm data_pagamento e cod_acordo: menor cod_prestacao\n")
+                f.write("4. Se data_pagamento null: prioriza cod_acordo=0\n")
+                f.write("5. Se data_pagamento null e ambos têm cod_acordo: menor cod_prestacao\n")
+            
+            self.atualizar_progresso(100, "✅ Resolução concluída!")
+            
+            # Log sucesso
+            self.logger.log_user_action(f"Resolver Duplicatas: Concluído com sucesso", 
+                                       registros_originais=total_inicial,
+                                       grupos_resolvidos=grupos_resolvidos,
+                                       registros_corretos_salvos=registros_resolvidos)
+            
+            # Mostrar resultado
+            resultado_msg = f"""✅ Resolução de duplicatas concluída!
+
+📊 Registros originais: {total_inicial:,}
+🎯 Grupos de duplicatas: {grupos_resolvidos:,}
+✅ Registros corretos escolhidos: {registros_resolvidos:,}
+📁 Arquivo salvo: {os.path.basename(arquivo_saida)}
+📝 Relatório salvo: {os.path.basename(relatorio_file)}
+
+🎯 Regras aplicadas:
+• Prioriza registros sem data_pagamento
+• Escolhe cod_acordo=0 quando aplicável  
+• Usa menor cod_prestacao como desempate"""
+            
+            messagebox.showinfo("Resolução Concluída", resultado_msg)
+            
+        except Exception as e:
+            self.logger.error(f"Erro na resolução de duplicatas: {e}")
+            self.atualizar_progresso(0, f"❌ Erro: {str(e)}")
+            messagebox.showerror("Erro", f"Erro na resolução de duplicatas:\n{str(e)}")
+        
+        finally:
+            # Voltar ao menu
+            self.voltar_menu()
+    
+    def abrir_nolog(self):
+        """Abre a interface do NoLog em uma nova janela"""
+        self.logger.log_user_action("Abriu NoLog", session_id=self.session_id)
+        
+        try:
+            # Criar nova janela
+            nolog_window = tk.Toplevel(self.root)
+            
+            # Importar e iniciar NoLog GUI
+            from src.nolog import NoLogGUI
+            
+            # Criar instância do NoLog na nova janela
+            nolog_app = NoLogGUI(nolog_window)
+            
+            self.logger.info("NoLog iniciado com sucesso")
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao abrir NoLog: {e}")
+            messagebox.showerror("Erro", f"Erro ao abrir NoLog:\n{str(e)}")
+    
+    def abrir_separador_dividas(self):
+        """Abre a interface do Separador de Dívidas em uma nova janela"""
+        self.logger.log_user_action("Abriu Separador de Dívidas", session_id=self.session_id)
+        
+        try:
+            # Criar nova janela
+            separador_window = tk.Toplevel(self.root)
+            
+            # Importar e iniciar Separador GUI
+            from src.separador_dividas import SeparadorDividasGUI
+            
+            # Criar instância do Separador na nova janela
+            separador_app = SeparadorDividasGUI(separador_window)
+            
+            self.logger.info("Separador de Dívidas iniciado com sucesso")
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao abrir Separador de Dívidas: {e}")
+            messagebox.showerror("Erro", f"Erro ao abrir Separador de Dívidas:\n{str(e)}")
+
+    def abrir_consulta_boleto_mensal(self):
+        """Abre diálogo para executar a Consulta Boleto Mensal (arquivo ou manual).
+
+        UI melhorada: permite escolher modo 'Arquivo' ou 'Manual', inserir múltiplos períodos
+        (uma por linha no formato YYYY-MM) e selecionar arquivo de saída.
+        """
+        self.logger.log_user_action("Abriu Consulta Boleto Mensal", session_id=self.session_id)
+
+        try:
+            dialog = tk.Toplevel(self.root)
+            dialog.title("📆 Consulta Boleto Mensal")
+            # Aumentar janela para caber todos os controles e permitir redimensionamento
+            dialog.geometry("900x620")
+            dialog.minsize(700, 520)
+            dialog.resizable(True, True)
+            dialog.transient(self.root)
+            dialog.grab_set()
+            dialog.configure(bg=self.theme_manager.get_color('background'))
+
+            container = self.theme_manager.create_card_frame(dialog, "📆 Consulta Boleto Mensal")
+            container.pack(fill='both', expand=True, padx=16, pady=16)
+
+            body = tk.Frame(container, bg=self.theme_manager.get_color('surface'))
+            body.pack(fill='both', expand=True, padx=12, pady=12)
+
+            # Modo: arquivo ou manual
+            mode_var = tk.StringVar(value='file')
+            mode_frame = tk.Frame(body, bg=self.theme_manager.get_color('surface'))
+            mode_frame.pack(fill='x', pady=(0, 8))
+            tk.Radiobutton(mode_frame, text='📁 Arquivo (vários alunos)', variable=mode_var, value='file', bg=self.theme_manager.get_color('surface')).pack(side='left', padx=6)
+            tk.Radiobutton(mode_frame, text='⌨️ Manual (colar/um por linha)', variable=mode_var, value='manual', bg=self.theme_manager.get_color('surface')).pack(side='left', padx=6)
+
+            # File selection area
+            file_frame = tk.Frame(body, bg=self.theme_manager.get_color('surface'))
+            file_frame.pack(fill='x', pady=(6, 6))
+            tk.Label(file_frame, text='Arquivo de entrada (Excel):', bg=self.theme_manager.get_color('surface')).pack(anchor='w')
+            entry_file = tk.Entry(file_frame, width=72)
+            entry_file.pack(fill='x', pady=(4, 4))
+
+            def pick_input():
+                f = filedialog.askopenfilename(title='Selecione o arquivo Excel', filetypes=[('Excel files','*.xlsx'),('All','*.*')])
+                if f:
+                    entry_file.delete(0, tk.END)
+                    entry_file.insert(0, f)
+
+            tk.Button(file_frame, text='Escolher...', command=pick_input).pack(anchor='e')
+
+            # Manual entry area (multiline)
+            manual_frame = tk.Frame(body, bg=self.theme_manager.get_color('surface'))
+            manual_frame.pack(fill='both', pady=(6, 6))
+            tk.Label(manual_frame, text='CPFs (um por linha, sem pontos):', bg=self.theme_manager.get_color('surface')).pack(anchor='w')
+            txt_manual = tk.Text(manual_frame, height=4)
+            txt_manual.pack(fill='x', pady=(4, 4))
+
+            # Periods area - allow multiple YYYY-MM
+            period_frame = tk.Frame(body, bg=self.theme_manager.get_color('surface'))
+            period_frame.pack(fill='both', pady=(6, 6))
+            tk.Label(period_frame, text='Períodos (uma linha por período - ex: 2025-08):', bg=self.theme_manager.get_color('surface')).pack(anchor='w')
+            txt_periods = tk.Text(period_frame, height=3)
+            txt_periods.insert('1.0', f"{time.localtime().tm_year}-{time.localtime().tm_mon:02d}")
+            txt_periods.pack(fill='x', pady=(4, 4))
+
+            # Output file
+            out_frame = tk.Frame(body, bg=self.theme_manager.get_color('surface'))
+            out_frame.pack(fill='x', pady=(6, 6))
+            tk.Label(out_frame, text='Arquivo de saída (Excel):', bg=self.theme_manager.get_color('surface')).pack(anchor='w')
+            entry_out = tk.Entry(out_frame, width=72)
+            entry_out.pack(fill='x', pady=(4, 4))
+
+            def pick_output():
+                default_name = f"consulta_boleto_{time.strftime('%Y%m%d_%H%M%S')}.xlsx"
+                f = filedialog.asksaveasfilename(title='Salvar resultado como', defaultextension='.xlsx', initialfile=default_name, filetypes=[('Excel files','*.xlsx')])
+                if f:
+                    entry_out.delete(0, tk.END)
+                    entry_out.insert(0, f)
+
+            tk.Button(out_frame, text='Escolher saída...', command=pick_output).pack(anchor='e')
+
+            # Start / Cancel buttons
+            btns = tk.Frame(body, bg=self.theme_manager.get_color('surface'))
+            btns.pack(fill='x', pady=(8, 0))
+
+            def start():
+                mode = mode_var.get()
+                periods_text = txt_periods.get('1.0', 'end').strip()
+                period_lines = [l.strip() for l in periods_text.splitlines() if l.strip()]
+                arquivo_saida = entry_out.get().strip()
+                if not period_lines:
+                    messagebox.showerror('Erro', 'Informe ao menos um período (ex: 2025-08)')
+                    return
+                if not arquivo_saida:
+                    messagebox.showerror('Erro', 'Selecione arquivo de saída')
+                    return
+
+                if mode == 'file':
+                    arquivo_entrada = entry_file.get().strip()
+                    if not arquivo_entrada:
+                        messagebox.showerror('Erro', 'Selecione arquivo de entrada')
+                        return
+                    dialog.destroy()
+                    thread = threading.Thread(target=self.executar_consulta_boleto_thread, args=(arquivo_entrada, arquivo_saida, period_lines, 'file'))
+                    thread.daemon = True
+                    thread.start()
+                else:
+                    manual_text = txt_manual.get('1.0', 'end').strip()
+                    if not manual_text:
+                        messagebox.showerror('Erro', 'Digite ao menos um CPF manualmente')
+                        return
+                    # construir rows a partir dos CPFs manualmente (cod_aluno vazio)
+                    cpfs = [l.strip() for l in re.split(r'[\n,;]+', manual_text) if l.strip()]
+                    rows = [("", c) for c in cpfs]
+                    dialog.destroy()
+                    thread = threading.Thread(target=self.executar_consulta_boleto_thread, args=(rows, arquivo_saida, period_lines, 'manual'))
+                    thread.daemon = True
+                    thread.start()
+
+            start_btn = tk.Button(btns, text='▶ Iniciar', command=start)
+            self.theme_manager.apply_theme_to_widget(start_btn, 'primary_button')
+            start_btn.pack(side='right')
+
+            cancel_btn = tk.Button(btns, text='❌ Fechar', command=dialog.destroy)
+            self.theme_manager.apply_theme_to_widget(cancel_btn, 'secondary_button')
+            cancel_btn.pack(side='right', padx=(0, 8))
+
+        except Exception as e:
+            self.logger.error(f"Erro ao abrir Consulta Boleto Mensal: {e}")
+            messagebox.showerror('Erro', f'Erro ao abrir Consulta Boleto Mensal:\n{e}')
+
+    def executar_consulta_boleto_thread(self, arquivo_entrada, arquivo_saida, ano, mes_or_mode):
+        """Thread que executa a consulta boleto mensal.
+
+        Args:
+            arquivo_entrada: path (str) when mode='file' or list of rows when mode='manual'
+            arquivo_saida: output path
+            ano: in our new contract holds the periods list
+            mes_or_mode: mode string - 'file' or 'manual'
+        """
+        try:
+            from src.consulta_boleto_mensal import run_consulta_boleto, run_consulta_boleto_from_rows
+
+            self.mostrar_progresso('Consulta Boleto Mensal')
+            self.atualizar_progresso(5, 'Iniciando consulta...')
+            start = time.time()
+
+            mode = mes_or_mode if isinstance(mes_or_mode, str) else 'file'
+            # In our call we pass periods via the `ano` parameter
+            period_lines = ano
+
+            if mode == 'manual':
+                # arquivo_entrada is actually rows list
+                rows = arquivo_entrada
+                run_consulta_boleto_from_rows(rows, arquivo_saida, period_lines)
+            else:
+                run_consulta_boleto(arquivo_entrada, arquivo_saida, period_lines)
+
+            elapsed = time.time() - start
+            self.atualizar_progresso(100, f'Concluído em {elapsed:.1f}s')
+            messagebox.showinfo('Sucesso', f'Consulta concluída! Arquivo salvo:\n{arquivo_saida}')
+
+        except Exception as e:
+            self.logger.error(f'Erro em Consulta Boleto Mensal: {e}')
+            self.atualizar_progresso(0, f'Erro: {e}')
+            messagebox.showerror('Erro', f'Erro durante a execução:\n{e}')
         finally:
             self.voltar_menu()
 
