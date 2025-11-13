@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Dict, Any
 
-class ThemeManager:
+class GerenciadorTema:
     def __init__(self):
         self.themes = {
             'modern': {
@@ -87,7 +87,8 @@ class ThemeManager:
                 }
             }
         }
-        self.current_theme = 'modern'
+        # Default to corporate blue theme for the professional UI
+        self.current_theme = 'corporate'
         self.custom_styles = {}
     
     def get_theme(self, theme_name: str = None) -> Dict[str, Any]:

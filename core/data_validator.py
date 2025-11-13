@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Tuple, Optional
 from datetime import datetime
 import json
 
-class DataValidator:
+class ValidadorDados:
     def __init__(self, logger=None):
         self.logger = logger
         self.validation_rules = {

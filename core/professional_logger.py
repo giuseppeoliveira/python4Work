@@ -12,7 +12,7 @@ from typing import Optional
 import json
 from pathlib import Path
 
-class ProfessionalLogger:
+class LoggerProfissional:
     def __init__(self, name: str = "Python4Work", config_manager=None):
         self.name = name
         self.config = config_manager
@@ -164,7 +164,7 @@ class ProfessionalLogger:
 class SessionLogger:
     """Logger específico para uma sessão de trabalho"""
     
-    def __init__(self, parent_logger: ProfessionalLogger, session_id: str):
+    def __init__(self, parent_logger: 'LoggerProfissional', session_id: str):
         self.parent = parent_logger
         self.session_id = session_id
         self.start_time = datetime.now()
