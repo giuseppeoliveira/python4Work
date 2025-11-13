@@ -82,7 +82,11 @@ class Python4WorkPro:
     def configurar_janela(self):
         """Configura a janela principal com tema profissional"""
         # Configurações da janela
-        width = self.config.get('ui.window_width', 1000)
+        # Ajuste: reduzir largura padrão para evitar janela muito larga
+        screen_w = self.root.winfo_screenwidth()
+        default_width = self.config.get('ui.window_width', 1000)
+        # garantir margem mínima de 200px (100px em cada lado)
+        width = min(default_width, max(800, screen_w - 200))
         height = self.config.get('ui.window_height', 700)
         
         self.root.title(f"{self.config.get('app.name', 'Python4Work Professional')} v{self.config.get('app.version', '2.0.0')}")
@@ -97,6 +101,11 @@ class Python4WorkPro:
         x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
+        # Guardar largura usada para layout interno
+        try:
+            self.window_width = int(width)
+        except Exception:
+            self.window_width = None
         
         # Configurar fechamento
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -166,7 +175,17 @@ class Python4WorkPro:
         """Cria cards das funcionalidades com design profissional e responsivo"""
         # Container dos cards
         cards_container = tk.Frame(self.scrollable_frame, bg=self.theme_manager.get_color('background'))
-        cards_container.pack(fill='both', expand=True, padx=20, pady=10)
+        # Ajuste de padding horizontal baseado na largura da janela para manter
+        # margens balanceadas e evitar que o conteúdo ocupe toda a largura.
+        padx = 20
+        try:
+            if hasattr(self, 'window_width') and self.window_width:
+                # Ajuste menor: usar cerca de 4% de cada lado como margem, com mínimo 12px
+                # Isso deixa os botões mais próximos das bordas conforme solicitado.
+                padx = max(12, int(self.window_width * 0.04))
+        except Exception:
+            padx = 20
+        cards_container.pack(fill='both', expand=True, padx=padx, pady=10)
         
         # Configurar grid responsivo - 2 colunas em telas normais, 1 em telas pequenas
         cards_container.grid_rowconfigure(0, weight=1)
@@ -281,11 +300,32 @@ class Python4WorkPro:
         self.theme_manager.apply_theme_to_widget(desc_label, 'description')
         desc_label.pack(fill='x', pady=(0, 15))
         
-        # Botão principal menor
-        btn = tk.Button(card_content, text="▶ Iniciar", 
+        # Botão principal menor - padronizar cor azul para ações
+        primary_blue = "#1E6FB8"
+        danger_red = "#c0392b"
+
+        btn_text = "▶ Iniciar"
+        btn = tk.Button(card_content, text=btn_text,
                        command=config['comando'],
                        font=("Arial", 10, "bold"), padx=15, pady=6)
-        self.theme_manager.apply_theme_to_widget(btn, f"{config['cor']}_button")
+
+        # Aplicar tema primeiro (padrões do GerenciadorTema), depois sobrescrever
+        # as cores para garantir que os botões dos cards fiquem azuis por padrão.
+        try:
+            self.theme_manager.apply_theme_to_widget(btn, f"{config['cor']}_button")
+        except Exception:
+            pass
+
+        # Agora force as cores desejadas (azul padrão) — exceto para ações de cancel/close
+        title_lower = config['titulo'].lower()
+        is_logout_like = any(k in title_lower for k in ['sair', 'fechar', 'cancelar', 'voltar'])
+        is_manter_sessao = ('manter' in title_lower) or ('sessão' in title_lower) or ('manter sessão' in title_lower)
+
+        if is_logout_like or is_manter_sessao:
+            btn.config(bg=danger_red, fg='white', activebackground="#a83228")
+        else:
+            btn.config(bg=primary_blue, fg='white', activebackground="#155a90")
+
         btn.pack(anchor='w')
         
         # Estatísticas compactas
@@ -768,8 +808,8 @@ class Python4WorkPro:
             return
         
         try:
-            # Copiar modelo da pasta Modelos
-            modelo_origem = "Modelos/modelo_consultar_acordo.xlsx"
+            # Copiar modelo da pasta data/Modelos (caminho absoluto relativo ao projeto)
+            modelo_origem = str(project_root / 'data' / 'Modelos' / 'modelo_consultar_acordo.xlsx')
             
             if not os.path.exists(modelo_origem):
                 messagebox.showerror("Erro", f"Modelo não encontrado: {modelo_origem}")
@@ -1031,8 +1071,8 @@ class Python4WorkPro:
             return
         
         try:
-            # Copiar modelo da pasta Modelos
-            modelo_origem = "Modelos/modelo_obter_divida_cpf.xlsx"
+            # Copiar modelo da pasta data/Modelos (caminho absoluto relativo ao projeto)
+            modelo_origem = str(project_root / 'data' / 'Modelos' / 'modelo_obter_divida_cpf.xlsx')
             
             if not os.path.exists(modelo_origem):
                 messagebox.showerror("Erro", f"Modelo não encontrado: {modelo_origem}")
@@ -1436,7 +1476,7 @@ class Python4WorkPro:
             self.voltar_menu()
             return
         elif opcao:  # Usar arquivo de exemplo
-            arquivo_entrada = "data/Modelos/arquivo_teste_duplicatas.xlsx"
+            arquivo_entrada = str(project_root / 'data' / 'Modelos' / 'arquivo_teste_duplicatas.xlsx')
             if not os.path.exists(arquivo_entrada):
                 messagebox.showerror("Erro", f"Arquivo de exemplo não encontrado:\n{arquivo_entrada}")
                 self.voltar_menu()
